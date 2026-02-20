@@ -16,6 +16,17 @@ interface PublicMetricsResponse {
   totalVisits?: number
 }
 
+interface AdminMetricsResponse {
+  totalVisits?: number
+  todayVisits?: number
+  uniqueVisitors?: number
+  recentVisits?: Array<{
+    visitorId?: string
+    ipAddress?: string
+    lastVisitedAt?: string
+  }>
+}
+
 const normalizeProduct = (item: ProductApiResponse): Product => {
   return {
     id: String(item.id ?? item._id ?? ''),
@@ -228,6 +239,35 @@ export const apiService = {
     } catch (error) {
       console.error('Error registering visit:', error)
       return null
+    }
+  },
+
+  async getAdminMetrics(): Promise<{
+    totalVisits: number
+    todayVisits: number
+    uniqueVisitors: number
+    recentVisits: Array<{ visitorId: string; ipAddress: string; lastVisitedAt: string }>
+  }> {
+    try {
+      const response = await axios.get<AdminMetricsResponse>(`${API_URL}/metrics/admin`)
+      return {
+        totalVisits: Number(response.data.totalVisits ?? 0),
+        todayVisits: Number(response.data.todayVisits ?? 0),
+        uniqueVisitors: Number(response.data.uniqueVisitors ?? 0),
+        recentVisits: (response.data.recentVisits ?? []).map((item) => ({
+          visitorId: String(item.visitorId ?? ''),
+          ipAddress: String(item.ipAddress ?? ''),
+          lastVisitedAt: String(item.lastVisitedAt ?? ''),
+        })),
+      }
+    } catch (error) {
+      console.error('Error loading admin metrics:', error)
+      return {
+        totalVisits: 0,
+        todayVisits: 0,
+        uniqueVisitors: 0,
+        recentVisits: [],
+      }
     }
   },
 }

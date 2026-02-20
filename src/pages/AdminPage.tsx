@@ -25,10 +25,19 @@ export const AdminPage = () => {
   const [isNew, setIsNew] = useState(true)
   const [showInBanner, setShowInBanner] = useState(true)
   const [loading, setLoading] = useState(false)
+  const [adminMetrics, setAdminMetrics] = useState({
+    totalVisits: 0,
+    todayVisits: 0,
+    uniqueVisitors: 0,
+    recentVisits: [] as Array<{ visitorId: string; ipAddress: string; lastVisitedAt: string }>,
+  })
 
   useEffect(() => {
     const loadCategories = async () => {
-      const fetchedProducts = await apiService.getProducts()
+      const [fetchedProducts, fetchedMetrics] = await Promise.all([
+        apiService.getProducts(),
+        apiService.getAdminMetrics(),
+      ])
       const categoryMap = new Map<string, string>()
 
       fetchedProducts.forEach((item) => {
@@ -42,6 +51,7 @@ export const AdminPage = () => {
       })
 
       setCategories(sortCategories(Array.from(categoryMap.values())))
+      setAdminMetrics(fetchedMetrics)
     }
 
     void loadCategories()
@@ -141,6 +151,58 @@ export const AdminPage = () => {
             >
               Cerrar sesión
             </button>
+          </div>
+
+          <div className="mb-6 space-y-3 rounded-2xl border border-primary-100 bg-primary-50/60 p-4">
+            <h2 className="text-lg font-bold text-primary-900">Métricas de visitas</h2>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-xl border border-primary-200 bg-white px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary-700">Visitas totales</p>
+                <p className="mt-1 text-2xl font-extrabold text-primary-900">{adminMetrics.totalVisits}</p>
+              </div>
+              <div className="rounded-xl border border-primary-200 bg-white px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary-700">Visitas hoy</p>
+                <p className="mt-1 text-2xl font-extrabold text-primary-900">{adminMetrics.todayVisits}</p>
+              </div>
+              <div className="rounded-xl border border-primary-200 bg-white px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-primary-700">Visitantes únicos</p>
+                <p className="mt-1 text-2xl font-extrabold text-primary-900">{adminMetrics.uniqueVisitors}</p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-primary-200 bg-white">
+              <table className="min-w-full divide-y divide-primary-100 text-sm">
+                <thead className="bg-primary-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-semibold text-primary-800">IP</th>
+                    <th className="px-3 py-2 text-left font-semibold text-primary-800">Visitor ID</th>
+                    <th className="px-3 py-2 text-left font-semibold text-primary-800">Última visita</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-primary-100">
+                  {adminMetrics.recentVisits.length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="px-3 py-4 text-center text-gray-500">
+                        Aún no hay visitas registradas
+                      </td>
+                    </tr>
+                  ) : (
+                    adminMetrics.recentVisits.map((visit, index) => (
+                      <tr key={`${visit.visitorId}-${visit.lastVisitedAt}-${index}`}>
+                        <td className="px-3 py-2 font-medium text-gray-700">{visit.ipAddress || 'N/A'}</td>
+                        <td className="px-3 py-2 text-gray-600">{visit.visitorId || 'N/A'}</td>
+                        <td className="px-3 py-2 text-gray-600">
+                          {visit.lastVisitedAt
+                            ? new Date(visit.lastVisitedAt).toLocaleString('es-EC')
+                            : 'N/A'}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
