@@ -270,13 +270,20 @@ export const AdminPage = () => {
             </button>
           </form>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
+          <div className="mt-5 grid gap-3 md:grid-cols-3">
             <button
               type="button"
               onClick={() => navigate('/admin/productos')}
               className="rounded-xl border border-primary-500 px-4 py-3 text-sm font-semibold text-primary-700 hover:bg-primary-50"
             >
               Gestionar Productos
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/admin/comentarios')}
+              className="rounded-xl border border-primary-500 px-4 py-3 text-sm font-semibold text-primary-700 hover:bg-primary-50"
+            >
+              Moderar Comentarios
             </button>
             <button
               type="button"

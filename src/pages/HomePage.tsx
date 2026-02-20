@@ -1,13 +1,28 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { CustomerReviewsSection } from '../components/CustomerReviewsSection'
 import { ProductCard } from '../components/ProductCard'
 import { StoreFooter } from '../components/StoreFooter'
 import { StoreHeader } from '../components/StoreHeader'
 import { apiService } from '../services/api'
 import type { Product } from '../types/product'
+import type { Review } from '../types/review'
 import { getProductBannerFlag } from '../utils/bannerSettings'
 import { isProductEnabled } from '../utils/productStatus'
 import { openWhatsApp } from '../utils/whatsapp'
+
+const VISITOR_ID_STORAGE_KEY = '@fl_store_visitor_id'
+
+const getOrCreateVisitorId = () => {
+  let currentVisitorId = localStorage.getItem(VISITOR_ID_STORAGE_KEY)
+
+  if (!currentVisitorId) {
+    currentVisitorId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
+    localStorage.setItem(VISITOR_ID_STORAGE_KEY, currentVisitorId)
+  }
+
+  return currentVisitorId
+}
 
 export const HomePage = () => {
   const navigate = useNavigate()
@@ -22,6 +37,13 @@ export const HomePage = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [showSortInfo, setShowSortInfo] = useState(false)
   const sortInfoRef = useRef<HTMLDivElement | null>(null)
+  const [publicReviews, setPublicReviews] = useState<Review[]>([])
+  const [reviewsStats, setReviewsStats] = useState({
+    totalReviews: 0,
+    averageRating: 0,
+    totalLikes: 0,
+  })
+  const [visitorId] = useState(getOrCreateVisitorId)
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -32,6 +54,32 @@ export const HomePage = () => {
     }
     void loadProducts()
   }, [])
+
+  const loadPublicReviews = useCallback(async () => {
+    if (!visitorId) return
+
+    const response = await apiService.getPublicReviews(visitorId)
+    setPublicReviews(response.reviews)
+    setReviewsStats(response.stats)
+  }, [visitorId])
+
+  useEffect(() => {
+    let isMounted = true
+
+    const fetchReviews = async () => {
+      if (!visitorId) return
+      const response = await apiService.getPublicReviews(visitorId)
+      if (!isMounted) return
+      setPublicReviews(response.reviews)
+      setReviewsStats(response.stats)
+    }
+
+    void fetchReviews()
+
+    return () => {
+      isMounted = false
+    }
+  }, [visitorId])
 
   const visibleProducts = useMemo(() => {
     return products.filter((item) => isProductEnabled(item.id))
@@ -53,8 +101,13 @@ export const HomePage = () => {
     return ['Todas', ...Array.from(categoryMap.values())]
   }, [visibleProducts])
 
+  const normalizedSelectedCategory = useMemo(() => {
+    const normalized = selectedCategory.trim().toLowerCase()
+    const available = categories.map((item) => item.trim().toLowerCase())
+    return available.includes(normalized) ? normalized : 'todas'
+  }, [categories, selectedCategory])
+
   const filteredProducts = useMemo(() => {
-    const normalizedSelectedCategory = selectedCategory.trim().toLowerCase()
 
     return visibleProducts.filter((item) => {
       const matchesSearch = item.name.toLowerCase().includes(searchText.toLowerCase())
@@ -62,7 +115,7 @@ export const HomePage = () => {
         normalizedSelectedCategory === 'todas' || item.category.trim().toLowerCase() === normalizedSelectedCategory
       return matchesSearch && matchesCategory
     })
-  }, [visibleProducts, searchText, selectedCategory])
+  }, [visibleProducts, searchText, normalizedSelectedCategory])
 
   const sortedProducts = useMemo(() => {
     const sorted = [...filteredProducts]
@@ -85,27 +138,13 @@ export const HomePage = () => {
 
   const totalPages = Math.max(1, Math.ceil(sortedProducts.length / PRODUCTS_PER_PAGE))
 
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+
   const paginatedProducts = useMemo(() => {
-    const startIndex = (currentPage - 1) * PRODUCTS_PER_PAGE
+    const startIndex = (safeCurrentPage - 1) * PRODUCTS_PER_PAGE
     const endIndex = startIndex + PRODUCTS_PER_PAGE
     return sortedProducts.slice(startIndex, endIndex)
-  }, [sortedProducts, currentPage, PRODUCTS_PER_PAGE])
-
-  useEffect(() => {
-    if (!categories.includes(selectedCategory)) {
-      setSelectedCategory('Todas')
-    }
-  }, [categories, selectedCategory])
-
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [searchText, selectedCategory, sortField, sortDirection])
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages)
-    }
-  }, [currentPage, totalPages])
+  }, [sortedProducts, safeCurrentPage, PRODUCTS_PER_PAGE])
 
   useEffect(() => {
     if (!showSortInfo) return
@@ -140,11 +179,13 @@ export const HomePage = () => {
   const handleSortSelect = (field: 'name' | 'price') => {
     if (sortField === field) {
       setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+      setCurrentPage(1)
       return
     }
 
     setSortField(field)
     setSortDirection('asc')
+    setCurrentPage(1)
   }
 
   const currentSortText =
@@ -222,7 +263,7 @@ export const HomePage = () => {
   }, [newsItems])
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-900 via-primary-700 to-primary-500">
+    <div className="min-h-screen bg-linear-to-b from-primary-900 via-primary-700 to-primary-500">
       <StoreHeader
         subtitle="Productos premium a tu alcance"
         onLogoLongPress={() => navigate('/login')}
@@ -235,10 +276,10 @@ export const HomePage = () => {
               <span className="mb-1 inline-flex w-fit items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-primary-700">
                 ✨ Catálogo Premium
               </span>
-              <h1 className="bg-gradient-to-r from-slate-900 via-primary-700 to-cyan-500 bg-clip-text text-3xl font-extrabold tracking-tight text-transparent drop-shadow-sm md:text-4xl">
+              <h1 className="bg-linear-to-r from-slate-900 via-primary-700 to-cyan-500 bg-clip-text text-3xl font-extrabold tracking-tight text-transparent drop-shadow-sm md:text-4xl">
                 Catálogo FL Store
               </h1>
-              <span className="mt-2 h-1 w-40 rounded-full bg-gradient-to-r from-primary-600 to-cyan-400" />
+              <span className="mt-2 h-1 w-40 rounded-full bg-linear-to-r from-primary-600 to-cyan-400" />
             </div>
           </div>
 
@@ -267,6 +308,7 @@ export const HomePage = () => {
               <input
                 value={searchText}
                 onChange={(event) => setSearchText(event.target.value)}
+                onInput={() => setCurrentPage(1)}
                 placeholder="Buscar productos..."
                 className="w-full bg-transparent py-3 text-sm text-gray-700 outline-none"
               />
@@ -277,9 +319,12 @@ export const HomePage = () => {
                 <button
                   key={category}
                   type="button"
-                  onClick={() => setSelectedCategory(category)}
+                  onClick={() => {
+                    setSelectedCategory(category)
+                    setCurrentPage(1)
+                  }}
                   className={`whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                    selectedCategory === category
+                    normalizedSelectedCategory === category.trim().toLowerCase()
                       ? 'border-primary-600 bg-primary-600 text-white'
                       : 'border-gray-300 bg-white text-gray-700 hover:border-primary-500 hover:text-primary-600'
                   }`}
@@ -362,7 +407,7 @@ export const HomePage = () => {
                 <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
                   <button
                     type="button"
-                    disabled={currentPage === 1}
+                    disabled={safeCurrentPage === 1}
                     onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                     className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary-500 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -375,7 +420,7 @@ export const HomePage = () => {
                       type="button"
                       onClick={() => setCurrentPage(page)}
                       className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                        currentPage === page
+                        safeCurrentPage === page
                           ? 'bg-primary-600 text-white'
                           : 'border border-gray-300 text-gray-700 hover:border-primary-500 hover:text-primary-600'
                       }`}
@@ -386,7 +431,7 @@ export const HomePage = () => {
 
                   <button
                     type="button"
-                    disabled={currentPage === totalPages}
+                    disabled={safeCurrentPage === totalPages}
                     onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                     className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary-500 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -396,6 +441,16 @@ export const HomePage = () => {
               )}
             </>
           )}
+
+          <CustomerReviewsSection
+            products={visibleProducts}
+            reviews={publicReviews}
+            averageRating={reviewsStats.averageRating}
+            totalReviews={reviewsStats.totalReviews}
+            totalLikes={reviewsStats.totalLikes}
+            onReviewSent={loadPublicReviews}
+            visitorId={visitorId}
+          />
         </section>
       </main>
 

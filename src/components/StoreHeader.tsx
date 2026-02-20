@@ -224,7 +224,7 @@ export const StoreHeader = ({ subtitle, onLogoLongPress }: StoreHeaderProps) => 
                     id="admin-mobile-menu"
                     role="menu"
                     aria-label="Menú de administrador"
-                    className="absolute right-0 mt-2 w-36 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
+                    className="absolute right-0 mt-2 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
                   >
                     <button
                       ref={(element) => {
@@ -263,6 +263,21 @@ export const StoreHeader = ({ subtitle, onLogoLongPress }: StoreHeaderProps) => 
                       type="button"
                       role="menuitem"
                       onKeyDown={(event) => handleAdminMenuItemKeyDown(event, 2)}
+                      onClick={() => {
+                        setIsAdminMenuOpen(false)
+                        navigate('/admin/comentarios')
+                      }}
+                      className="block w-full px-3 py-2 text-left text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      Comentarios
+                    </button>
+                    <button
+                      ref={(element) => {
+                        adminMenuItemRefs.current[3] = element
+                      }}
+                      type="button"
+                      role="menuitem"
+                      onKeyDown={(event) => handleAdminMenuItemKeyDown(event, 3)}
                       onClick={handleLogout}
                       className="block w-full px-3 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50"
                     >
@@ -284,6 +299,12 @@ export const StoreHeader = ({ subtitle, onLogoLongPress }: StoreHeaderProps) => 
                   className={`whitespace-nowrap ${isScrolled ? 'text-gray-700' : 'text-white'} transition hover:text-primary-500`}
                 >
                   Gestionar
+                </Link>
+                <Link
+                  to="/admin/comentarios"
+                  className={`whitespace-nowrap ${isScrolled ? 'text-gray-700' : 'text-white'} transition hover:text-primary-500`}
+                >
+                  Comentarios
                 </Link>
                 <button
                   type="button"

@@ -5,6 +5,7 @@ import { LoginPage } from './pages/LoginPage'
 import { AdminPage } from './pages/AdminPage'
 import { ManageProductsPage } from './pages/ManageProductsPage'
 import { EditProductPage } from './pages/EditProductPage'
+import { ManageReviewsPage } from './pages/ManageReviewsPage'
 import { ProtectedRoute } from './components/ProtectedRoute'
 
 function App() {
@@ -27,6 +28,14 @@ function App() {
           element={
             <ProtectedRoute>
               <ManageProductsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/comentarios"
+          element={
+            <ProtectedRoute>
+              <ManageReviewsPage />
             </ProtectedRoute>
           }
         />

@@ -1,9 +1,16 @@
 import axios from 'axios'
 import type { Product } from '../types/product'
+import type { CreateReviewPayload, PublicReviewStats, Review } from '../types/review'
 
 const API_URL = 'https://fl-store-backend.onrender.com/api'
 
 type ProductApiResponse = Partial<Product> & { _id?: string }
+type ReviewApiResponse = Partial<Review> & { _id?: string }
+
+interface PublicReviewsResponse {
+  reviews: ReviewApiResponse[]
+  stats?: Partial<PublicReviewStats>
+}
 
 const normalizeProduct = (item: ProductApiResponse): Product => {
   return {
@@ -14,6 +21,23 @@ const normalizeProduct = (item: ProductApiResponse): Product => {
     image: item.image ?? '',
     category: item.category ?? '',
     isNew: Boolean(item.isNew),
+  }
+}
+
+const normalizeReview = (item: ReviewApiResponse): Review => {
+  return {
+    id: String(item.id ?? item._id ?? ''),
+    customerName: item.customerName ?? '',
+    productId: item.productId ?? '',
+    productName: item.productName ?? '',
+    category: item.category ?? '',
+    rating: Number(item.rating ?? 0),
+    comment: item.comment ?? '',
+    recommend: Boolean(item.recommend),
+    likeCount: Number(item.likeCount ?? 0),
+    likedByVisitor: Boolean(item.likedByVisitor),
+    status: (item.status as Review['status']) ?? 'pending',
+    createdAt: item.createdAt ?? '',
   }
 }
 
@@ -99,6 +123,83 @@ export const apiService = {
     } catch (error) {
       console.error('Error in login:', error)
       return false
+    }
+  },
+
+  async createReview(payload: CreateReviewPayload): Promise<string | null> {
+    try {
+      const response = await axios.post<{ message: string }>(`${API_URL}/reviews`, payload)
+      return response.data.message
+    } catch (error) {
+      console.error('Error creating review:', error)
+      return null
+    }
+  },
+
+  async getPublicReviews(visitorId?: string): Promise<{ reviews: Review[]; stats: PublicReviewStats }> {
+    try {
+      const response = await axios.get<PublicReviewsResponse>(`${API_URL}/reviews/public`, {
+        params: visitorId ? { visitorId } : undefined,
+      })
+      return {
+        reviews: (response.data.reviews ?? []).map(normalizeReview),
+        stats: {
+          totalReviews: Number(response.data.stats?.totalReviews ?? 0),
+          averageRating: Number(response.data.stats?.averageRating ?? 0),
+          totalLikes: Number(response.data.stats?.totalLikes ?? 0),
+        },
+      }
+    } catch (error) {
+      console.error('Error loading public reviews:', error)
+      return {
+        reviews: [],
+        stats: {
+          totalReviews: 0,
+          averageRating: 0,
+          totalLikes: 0,
+        },
+      }
+    }
+  },
+
+  async getAdminReviews(): Promise<Review[]> {
+    try {
+      const response = await axios.get<ReviewApiResponse[]>(`${API_URL}/reviews/admin`)
+      return response.data.map(normalizeReview)
+    } catch (error) {
+      console.error('Error loading admin reviews:', error)
+      return []
+    }
+  },
+
+  async updateReviewStatus(id: string, status: Review['status']): Promise<Review | null> {
+    try {
+      const response = await axios.patch<ReviewApiResponse>(`${API_URL}/reviews/${id}/status`, { status })
+      return normalizeReview(response.data)
+    } catch (error) {
+      console.error('Error updating review status:', error)
+      return null
+    }
+  },
+
+  async setReviewLike(
+    reviewId: string,
+    visitorId: string,
+    liked: boolean
+  ): Promise<{ likeCount: number; likedByVisitor: boolean } | null> {
+    try {
+      const response = await axios.patch<{ likeCount: number; likedByVisitor: boolean }>(
+        `${API_URL}/reviews/${reviewId}/like`,
+        { visitorId, liked }
+      )
+
+      return {
+        likeCount: Number(response.data.likeCount ?? 0),
+        likedByVisitor: Boolean(response.data.likedByVisitor),
+      }
+    } catch (error) {
+      console.error('Error updating review like:', error)
+      return null
     }
   },
 }
