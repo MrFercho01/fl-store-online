@@ -1,0 +1,405 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { ProductCard } from '../components/ProductCard'
+import { StoreFooter } from '../components/StoreFooter'
+import { StoreHeader } from '../components/StoreHeader'
+import { apiService } from '../services/api'
+import type { Product } from '../types/product'
+import { getProductBannerFlag } from '../utils/bannerSettings'
+import { isProductEnabled } from '../utils/productStatus'
+import { openWhatsApp } from '../utils/whatsapp'
+
+export const HomePage = () => {
+  const navigate = useNavigate()
+  const PRODUCTS_PER_PAGE = 6
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchText, setSearchText] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('Todas')
+  const [newsIndex, setNewsIndex] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [sortField, setSortField] = useState<'name' | 'price'>('name')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [showSortInfo, setShowSortInfo] = useState(false)
+  const sortInfoRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      setLoading(true)
+      const fetchedProducts = await apiService.getProducts()
+      setProducts(fetchedProducts)
+      setLoading(false)
+    }
+    void loadProducts()
+  }, [])
+
+  const visibleProducts = useMemo(() => {
+    return products.filter((item) => isProductEnabled(item.id))
+  }, [products])
+
+  const categories = useMemo(() => {
+    const categoryMap = new Map<string, string>()
+
+    visibleProducts.forEach((item) => {
+      const categoryValue = item.category.trim()
+      if (!categoryValue) return
+
+      const key = categoryValue.toLowerCase()
+      if (!categoryMap.has(key)) {
+        categoryMap.set(key, categoryValue)
+      }
+    })
+
+    return ['Todas', ...Array.from(categoryMap.values())]
+  }, [visibleProducts])
+
+  const filteredProducts = useMemo(() => {
+    const normalizedSelectedCategory = selectedCategory.trim().toLowerCase()
+
+    return visibleProducts.filter((item) => {
+      const matchesSearch = item.name.toLowerCase().includes(searchText.toLowerCase())
+      const matchesCategory =
+        normalizedSelectedCategory === 'todas' || item.category.trim().toLowerCase() === normalizedSelectedCategory
+      return matchesSearch && matchesCategory
+    })
+  }, [visibleProducts, searchText, selectedCategory])
+
+  const sortedProducts = useMemo(() => {
+    const sorted = [...filteredProducts]
+
+    if (sortField === 'name') {
+      sorted.sort((first, second) => {
+        const compareValue = first.name.localeCompare(second.name, 'es', { sensitivity: 'base' })
+        return sortDirection === 'asc' ? compareValue : -compareValue
+      })
+      return sorted
+    }
+
+    sorted.sort((first, second) => {
+      const compareValue = first.price - second.price
+      return sortDirection === 'asc' ? compareValue : -compareValue
+    })
+
+    return sorted
+  }, [filteredProducts, sortField, sortDirection])
+
+  const totalPages = Math.max(1, Math.ceil(sortedProducts.length / PRODUCTS_PER_PAGE))
+
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * PRODUCTS_PER_PAGE
+    const endIndex = startIndex + PRODUCTS_PER_PAGE
+    return sortedProducts.slice(startIndex, endIndex)
+  }, [sortedProducts, currentPage, PRODUCTS_PER_PAGE])
+
+  useEffect(() => {
+    if (!categories.includes(selectedCategory)) {
+      setSelectedCategory('Todas')
+    }
+  }, [categories, selectedCategory])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchText, selectedCategory, sortField, sortDirection])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
+
+  useEffect(() => {
+    if (!showSortInfo) return
+
+    const handlePointerDownOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node | null
+      if (!target) return
+
+      if (sortInfoRef.current && !sortInfoRef.current.contains(target)) {
+        setShowSortInfo(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDownOutside)
+    document.addEventListener('touchstart', handlePointerDownOutside)
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowSortInfo(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDownOutside)
+      document.removeEventListener('touchstart', handlePointerDownOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [showSortInfo])
+
+  const handleSortSelect = (field: 'name' | 'price') => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+      return
+    }
+
+    setSortField(field)
+    setSortDirection('asc')
+  }
+
+  const currentSortText =
+    sortField === 'name'
+      ? `Orden actual: Nombre ${sortDirection === 'asc' ? 'ascendente' : 'descendente'}`
+      : `Orden actual: Precio ${sortDirection === 'asc' ? 'ascendente' : 'descendente'}`
+
+  const newsItems = useMemo(() => {
+    const bannerProducts = visibleProducts.filter((item) => getProductBannerFlag(item)).slice(0, 3)
+    const base = [
+      { type: 'oferta', text: 'Ofertas exclusivas activas hoy en FL Store' },
+      { type: 'envio', text: 'Envíos rápidos y seguros en todo momento' },
+    ]
+
+    if (bannerProducts.length > 0) {
+      const dynamicNews = bannerProducts.map((item) => ({
+        type: 'nuevo',
+        text: `Nuevo ingreso: ${item.name} por $${item.price}`,
+      }))
+      return [...dynamicNews, ...base]
+    }
+
+    return base
+  }, [visibleProducts])
+
+  const currentNews = newsItems[newsIndex]
+
+  const currentBadge = useMemo(() => {
+    if (!currentNews) return '✨ NOVEDADES'
+    if (currentNews.type === 'nuevo') return '🆕 NUEVO'
+    if (currentNews.type === 'envio') return '🚚 ENVÍO'
+    return '🔥 OFERTA'
+  }, [currentNews])
+
+  const newsVariant = useMemo(() => {
+    if (!currentNews) {
+      return {
+        wrapper: 'border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 shadow-[0_8px_20px_rgba(245,158,11,0.15)]',
+        badge: 'bg-amber-500 text-slate-900',
+        text: 'text-amber-900',
+      }
+    }
+
+    if (currentNews.type === 'nuevo') {
+      return {
+        wrapper: 'border-lime-300 bg-gradient-to-r from-lime-50 to-emerald-50 shadow-[0_8px_20px_rgba(132,204,22,0.18)]',
+        badge: 'bg-lime-500 text-slate-900',
+        text: 'text-emerald-900',
+      }
+    }
+
+    if (currentNews.type === 'envio') {
+      return {
+        wrapper: 'border-sky-300 bg-gradient-to-r from-sky-50 to-cyan-50 shadow-[0_8px_20px_rgba(14,165,233,0.16)]',
+        badge: 'bg-sky-500 text-white',
+        text: 'text-sky-900',
+      }
+    }
+
+    return {
+      wrapper: 'border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 shadow-[0_8px_20px_rgba(245,158,11,0.15)]',
+      badge: 'bg-amber-500 text-slate-900',
+      text: 'text-amber-900',
+    }
+  }, [currentNews])
+
+  useEffect(() => {
+    if (newsItems.length <= 1) return
+
+    const timer = window.setInterval(() => {
+      setNewsIndex((prev) => (prev + 1) % newsItems.length)
+    }, 3200)
+
+    return () => window.clearInterval(timer)
+  }, [newsItems])
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-primary-900 via-primary-700 to-primary-500">
+      <StoreHeader
+        subtitle="Productos premium a tu alcance"
+        onLogoLongPress={() => navigate('/login')}
+      />
+
+      <main className="mx-auto w-full max-w-7xl px-4 pb-12 pt-32 md:px-8">
+        <section className="rounded-3xl bg-white/95 p-6 shadow-2xl backdrop-blur-sm md:p-8">
+          <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="inline-flex w-fit flex-col">
+              <span className="mb-1 inline-flex w-fit items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-primary-700">
+                ✨ Catálogo Premium
+              </span>
+              <h1 className="bg-gradient-to-r from-slate-900 via-primary-700 to-cyan-500 bg-clip-text text-3xl font-extrabold tracking-tight text-transparent drop-shadow-sm md:text-4xl">
+                Catálogo FL Store
+              </h1>
+              <span className="mt-2 h-1 w-40 rounded-full bg-gradient-to-r from-primary-600 to-cyan-400" />
+            </div>
+          </div>
+
+          <div className={`mb-5 overflow-hidden rounded-2xl border transition-colors duration-500 ${newsVariant.wrapper}`}>
+            <div className="flex items-center gap-3 px-4 py-2.5">
+              <span
+                key={currentBadge}
+                className={`rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide transition-colors duration-500 ${newsVariant.badge}`}
+              >
+                <span className="animate-[newsFade_320ms_ease]">{currentBadge}</span>
+              </span>
+              <div className="relative h-6 flex-1 overflow-hidden">
+                <p
+                  key={`${currentNews?.text ?? ''}-${newsIndex}`}
+                  className={`absolute inset-0 line-clamp-1 animate-[newsFade_320ms_ease] text-sm font-semibold ${newsVariant.text}`}
+                >
+                  {currentNews?.text ?? ''}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-6 grid gap-3 md:grid-cols-[2fr_3fr]">
+            <div className="flex items-center rounded-xl border border-gray-200 bg-gray-50 px-4">
+              <span className="mr-2 text-lg">🔍</span>
+              <input
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                placeholder="Buscar productos..."
+                className="w-full bg-transparent py-3 text-sm text-gray-700 outline-none"
+              />
+            </div>
+
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {categories.map((category) => (
+                <button
+                  key={category}
+                  type="button"
+                  onClick={() => setSelectedCategory(category)}
+                  className={`whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                    selectedCategory === category
+                      ? 'border-primary-600 bg-primary-600 text-white'
+                      : 'border-gray-300 bg-white text-gray-700 hover:border-primary-500 hover:text-primary-600'
+                  }`}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50/70 px-4 py-3">
+            <div ref={sortInfoRef} className="relative flex items-center gap-2">
+              <p className="text-sm font-semibold text-gray-700">Ordenar catálogo:</p>
+              <button
+                type="button"
+                aria-label="Mostrar orden actual"
+                onMouseEnter={() => setShowSortInfo(true)}
+                onMouseLeave={() => setShowSortInfo(false)}
+                onFocus={() => setShowSortInfo(true)}
+                onBlur={() => setShowSortInfo(false)}
+                onClick={() => setShowSortInfo((prev) => !prev)}
+                className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-primary-200 bg-white text-xs font-bold text-primary-700 transition hover:border-primary-400"
+              >
+                ℹ️
+              </button>
+
+              {showSortInfo && (
+                <div className="absolute left-0 top-8 z-20 w-64 rounded-xl border border-primary-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 shadow-lg">
+                  {currentSortText}
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleSortSelect('name')}
+                className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
+                  sortField === 'name'
+                    ? 'border-primary-600 bg-primary-600 text-white'
+                    : 'border-gray-300 bg-white text-gray-700 hover:border-primary-500 hover:text-primary-600'
+                }`}
+              >
+                🔤 Nombre {sortField === 'name' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSortSelect('price')}
+                className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
+                  sortField === 'price'
+                    ? 'border-primary-600 bg-primary-600 text-white'
+                    : 'border-gray-300 bg-white text-gray-700 hover:border-primary-500 hover:text-primary-600'
+                }`}
+              >
+                💲 Precio {sortField === 'price' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
+              </button>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="py-16 text-center text-gray-600">Cargando productos...</div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-300 py-16 text-center">
+              <p className="text-lg font-semibold text-gray-800">No hay productos disponibles</p>
+              <p className="mt-2 text-sm text-gray-600">Usa el panel admin para agregar productos</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {paginatedProducts.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    onView={() => navigate(`/producto/${product.id}`)}
+                    onContact={() => openWhatsApp(`Hola! Estoy interesado en: ${product.name}`)}
+                  />
+                ))}
+              </div>
+
+              {sortedProducts.length > PRODUCTS_PER_PAGE && (
+                <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                    className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary-500 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Anterior
+                  </button>
+
+                  {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => setCurrentPage(page)}
+                      className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                        currentPage === page
+                          ? 'bg-primary-600 text-white'
+                          : 'border border-gray-300 text-gray-700 hover:border-primary-500 hover:text-primary-600'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+
+                  <button
+                    type="button"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                    className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary-500 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Siguiente
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      </main>
+
+      <StoreFooter />
+    </div>
+  )
+}
