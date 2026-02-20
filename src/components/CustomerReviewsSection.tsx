@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { apiService } from '../services/api'
 import type { Product } from '../types/product'
 import type { Review } from '../types/review'
@@ -44,6 +44,39 @@ export const CustomerReviewsSection = ({
   const [recommend, setRecommend] = useState(true)
   const [likingReviewId, setLikingReviewId] = useState('')
   const [reviewLikeOverrides, setReviewLikeOverrides] = useState<Record<string, { likeCount: number; likedByVisitor: boolean }>>({})
+  const openPopupButtonRef = useRef<HTMLButtonElement | null>(null)
+  const popupContainerRef = useRef<HTMLDivElement | null>(null)
+  const popupFirstInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (!isPopupOpen) return
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      popupContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      popupFirstInputRef.current?.focus({ preventScroll: true })
+    })
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame)
+    }
+  }, [isPopupOpen])
+
+  useEffect(() => {
+    if (!isPopupOpen) return
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+
+      setIsPopupOpen(false)
+      openPopupButtonRef.current?.focus()
+    }
+
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isPopupOpen])
 
   const displayedReviews = useMemo(() => {
     return reviews.map((review) => {
@@ -169,6 +202,7 @@ export const CustomerReviewsSection = ({
             ❤️ {displayedTotalLikes} likes
           </span>
           <button
+            ref={openPopupButtonRef}
             type="button"
             onClick={() => setIsPopupOpen(true)}
             className="rounded-full border border-primary-500 bg-primary-600 px-3 py-1 text-white transition hover:bg-primary-700"
@@ -226,12 +260,15 @@ export const CustomerReviewsSection = ({
 
       {isPopupOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl">
+          <div ref={popupContainerRef} className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-bold text-gray-900">Comparte tu experiencia</h3>
               <button
                 type="button"
-                onClick={() => setIsPopupOpen(false)}
+                onClick={() => {
+                  setIsPopupOpen(false)
+                  openPopupButtonRef.current?.focus()
+                }}
                 className="rounded-lg border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-600"
               >
                 Cerrar
@@ -242,6 +279,7 @@ export const CustomerReviewsSection = ({
               <label className="block">
                 <span className="mb-1 block text-sm font-semibold text-gray-700">Tu nombre</span>
                 <input
+                  ref={popupFirstInputRef}
                   value={customerName}
                   onChange={(event) => setCustomerName(event.target.value)}
                   className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm outline-none ring-primary-200 focus:ring"
