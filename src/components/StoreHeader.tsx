@@ -162,8 +162,8 @@ export const StoreHeader = ({ subtitle, onLogoLongPress }: StoreHeaderProps) => 
             <div
               className={`absolute -inset-1 rounded-full blur opacity-60 transition duration-300 ${
                 isScrolled
-                  ? 'bg-gradient-to-r from-primary-400 to-primary-600'
-                  : 'bg-gradient-to-r from-white to-primary-200'
+                  ? 'bg-linear-to-r from-primary-400 to-primary-600'
+                  : 'bg-linear-to-r from-white to-primary-200'
               }`}
             />
             <img

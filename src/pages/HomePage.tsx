@@ -12,6 +12,7 @@ import { isProductEnabled } from '../utils/productStatus'
 import { openWhatsApp } from '../utils/whatsapp'
 
 const VISITOR_ID_STORAGE_KEY = '@fl_store_visitor_id'
+const PRODUCTS_PER_PAGE = 6
 
 const getOrCreateVisitorId = () => {
   let currentVisitorId = localStorage.getItem(VISITOR_ID_STORAGE_KEY)
@@ -26,7 +27,6 @@ const getOrCreateVisitorId = () => {
 
 export const HomePage = () => {
   const navigate = useNavigate()
-  const PRODUCTS_PER_PAGE = 6
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [searchText, setSearchText] = useState('')
@@ -144,7 +144,7 @@ export const HomePage = () => {
     const startIndex = (safeCurrentPage - 1) * PRODUCTS_PER_PAGE
     const endIndex = startIndex + PRODUCTS_PER_PAGE
     return sortedProducts.slice(startIndex, endIndex)
-  }, [sortedProducts, safeCurrentPage, PRODUCTS_PER_PAGE])
+  }, [sortedProducts, safeCurrentPage])
 
   useEffect(() => {
     if (!showSortInfo) return
@@ -223,7 +223,7 @@ export const HomePage = () => {
   const newsVariant = useMemo(() => {
     if (!currentNews) {
       return {
-        wrapper: 'border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 shadow-[0_8px_20px_rgba(245,158,11,0.15)]',
+        wrapper: 'border-amber-300 bg-linear-to-r from-amber-50 to-orange-50 shadow-[0_8px_20px_rgba(245,158,11,0.15)]',
         badge: 'bg-amber-500 text-slate-900',
         text: 'text-amber-900',
       }
@@ -231,7 +231,7 @@ export const HomePage = () => {
 
     if (currentNews.type === 'nuevo') {
       return {
-        wrapper: 'border-lime-300 bg-gradient-to-r from-lime-50 to-emerald-50 shadow-[0_8px_20px_rgba(132,204,22,0.18)]',
+        wrapper: 'border-lime-300 bg-linear-to-r from-lime-50 to-emerald-50 shadow-[0_8px_20px_rgba(132,204,22,0.18)]',
         badge: 'bg-lime-500 text-slate-900',
         text: 'text-emerald-900',
       }
@@ -239,14 +239,14 @@ export const HomePage = () => {
 
     if (currentNews.type === 'envio') {
       return {
-        wrapper: 'border-sky-300 bg-gradient-to-r from-sky-50 to-cyan-50 shadow-[0_8px_20px_rgba(14,165,233,0.16)]',
+        wrapper: 'border-sky-300 bg-linear-to-r from-sky-50 to-cyan-50 shadow-[0_8px_20px_rgba(14,165,233,0.16)]',
         badge: 'bg-sky-500 text-white',
         text: 'text-sky-900',
       }
     }
 
     return {
-      wrapper: 'border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 shadow-[0_8px_20px_rgba(245,158,11,0.15)]',
+      wrapper: 'border-amber-300 bg-linear-to-r from-amber-50 to-orange-50 shadow-[0_8px_20px_rgba(245,158,11,0.15)]',
       badge: 'bg-amber-500 text-slate-900',
       text: 'text-amber-900',
     }

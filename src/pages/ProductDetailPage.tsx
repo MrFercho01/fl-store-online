@@ -42,7 +42,7 @@ export const ProductDetailPage = () => {
   }, [id])
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-900 via-primary-700 to-primary-500">
+    <div className="min-h-screen bg-linear-to-b from-primary-900 via-primary-700 to-primary-500">
       <StoreHeader subtitle="Detalle de producto" />
 
       <main className="mx-auto w-full max-w-6xl px-4 pb-12 pt-32 md:px-8">

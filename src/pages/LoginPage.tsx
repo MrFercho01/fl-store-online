@@ -33,7 +33,7 @@ export const LoginPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-900 via-primary-700 to-primary-500">
+    <div className="min-h-screen bg-linear-to-b from-primary-900 via-primary-700 to-primary-500">
       <StoreHeader subtitle="Panel de administrador" />
 
       <main className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-4 py-24 md:px-8">

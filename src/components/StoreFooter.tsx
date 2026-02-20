@@ -41,7 +41,7 @@ export const StoreFooter = () => {
             <p className="text-lg font-bold text-white">Fernando Lara Soft</p>
             <p className="text-sm text-slate-300">Soluciones digitales innovadoras para tu negocio</p>
             <p className="mt-1 text-sm font-semibold text-primary-200">
-              Desarrollado por <span className="text-primary-300">Fernando Lara Soft</span>
+              Desarrollado por <span className="text-primary-300">Fernando Lara Morán</span>
             </p>
             <p className="mt-1 text-xs text-slate-400">© {year} Todos los derechos reservados</p>
           </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { StoreFooter } from '../components/StoreFooter'
@@ -27,7 +27,6 @@ export const EditProductPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('')
   const [newCategory, setNewCategory] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
-  const [preview, setPreview] = useState('')
   const [isNew, setIsNew] = useState(false)
   const [showInBanner, setShowInBanner] = useState(false)
 
@@ -63,7 +62,6 @@ export const EditProductPage = () => {
         setDescription(fetchedProduct.description)
         setPrice(String(fetchedProduct.price))
         setSelectedCategory(fetchedProduct.category.trim())
-        setPreview(fetchedProduct.image)
         setIsNew(fetchedProduct.isNew)
         setShowInBanner(getProductBannerFlag(fetchedProduct))
       }
@@ -73,14 +71,21 @@ export const EditProductPage = () => {
     void loadProduct()
   }, [id])
 
-  useEffect(() => {
+  const preview = useMemo(() => {
     if (imageFile) {
-      const objectUrl = URL.createObjectURL(imageFile)
-      setPreview(objectUrl)
-      return () => URL.revokeObjectURL(objectUrl)
+      return URL.createObjectURL(imageFile)
     }
-    return
-  }, [imageFile])
+
+    return product?.image ?? ''
+  }, [imageFile, product?.image])
+
+  useEffect(() => {
+    if (!imageFile || !preview) return
+
+    return () => {
+      URL.revokeObjectURL(preview)
+    }
+  }, [imageFile, preview])
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -144,7 +149,7 @@ export const EditProductPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-900 via-primary-700 to-primary-500">
+    <div className="min-h-screen bg-linear-to-b from-primary-900 via-primary-700 to-primary-500">
       <StoreHeader subtitle="Editar producto" />
 
       <main className="mx-auto w-full max-w-4xl px-4 pb-10 pt-32 md:px-8">

@@ -13,6 +13,10 @@ interface CustomerReviewsSectionProps {
   visitorId: string
 }
 
+const DEFAULT_REVIEW_RATING = 5
+
+const normalizeCategory = (value: string) => value.trim().toLowerCase()
+
 const renderStars = (rating: number) => {
   return '★★★★★'.split('').map((star, index) => (
     <span key={`${star}-${index}`} className={index < rating ? 'text-amber-500' : 'text-gray-300'}>
@@ -35,7 +39,7 @@ export const CustomerReviewsSection = ({
   const [customerName, setCustomerName] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedProductId, setSelectedProductId] = useState('')
-  const [rating, setRating] = useState(5)
+  const [rating, setRating] = useState(DEFAULT_REVIEW_RATING)
   const [comment, setComment] = useState('')
   const [recommend, setRecommend] = useState(true)
   const [likingReviewId, setLikingReviewId] = useState('')
@@ -65,24 +69,30 @@ export const CustomerReviewsSection = ({
     products.forEach((item) => {
       const value = item.category.trim()
       if (!value) return
-      const key = value.toLowerCase()
+      const key = normalizeCategory(value)
       if (!map.has(key)) map.set(key, value)
     })
-    return Array.from(map.values())
+    return Array.from(map.values()).sort((first, second) =>
+      first.localeCompare(second, 'es', { sensitivity: 'base' })
+    )
   }, [products])
 
   const productsByCategory = useMemo(() => {
     if (!selectedCategory) return []
-    return products.filter((item) => item.category.trim().toLowerCase() === selectedCategory.trim().toLowerCase())
+    const normalizedSelectedCategory = normalizeCategory(selectedCategory)
+    return products.filter((item) => normalizeCategory(item.category) === normalizedSelectedCategory)
   }, [products, selectedCategory])
 
-  const selectedProduct = productsByCategory.find((item) => item.id === selectedProductId)
+  const selectedProduct = useMemo(
+    () => productsByCategory.find((item) => item.id === selectedProductId),
+    [productsByCategory, selectedProductId]
+  )
 
   const resetForm = () => {
     setCustomerName('')
     setSelectedCategory('')
     setSelectedProductId('')
-    setRating(5)
+    setRating(DEFAULT_REVIEW_RATING)
     setComment('')
     setRecommend(true)
   }
@@ -181,34 +191,34 @@ export const CustomerReviewsSection = ({
             const isUpdatingLike = likingReviewId === review.id
 
             return (
-            <article key={review.id} className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
-              <div className="mb-2 flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-sm font-bold text-gray-900">{review.customerName}</p>
-                  <p className="text-xs font-semibold text-primary-700">Compra: {review.productName}</p>
+              <article key={review.id} className="rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+                <div className="mb-2 flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">{review.customerName}</p>
+                    <p className="text-xs font-semibold text-primary-700">Compra: {review.productName}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-rose-600">
+                      ❤️ {reviewLikes}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={isUpdatingLike}
+                      onClick={() => void handleToggleLike(review)}
+                      className={`rounded-full border px-2 py-1 text-[11px] font-bold transition ${
+                        isLikedByVisitor
+                          ? 'border-rose-300 bg-rose-100 text-rose-700'
+                          : 'border-gray-300 bg-white text-gray-600 hover:border-rose-300 hover:text-rose-700'
+                      } disabled:opacity-60`}
+                    >
+                      {isUpdatingLike ? 'Actualizando...' : isLikedByVisitor ? 'Quitar like' : 'Dar like'}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-white px-2 py-1 text-xs font-semibold text-rose-600">
-                    ❤️ {reviewLikes}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={isUpdatingLike}
-                    onClick={() => void handleToggleLike(review)}
-                    className={`rounded-full border px-2 py-1 text-[11px] font-bold transition ${
-                      isLikedByVisitor
-                        ? 'border-rose-300 bg-rose-100 text-rose-700'
-                        : 'border-gray-300 bg-white text-gray-600 hover:border-rose-300 hover:text-rose-700'
-                    } disabled:opacity-60`}
-                  >
-                    {isUpdatingLike ? 'Actualizando...' : isLikedByVisitor ? 'Quitar like' : 'Dar like'}
-                  </button>
-                </div>
-              </div>
 
-              <div className="mb-2 flex items-center gap-1 text-sm">{renderStars(review.rating)}</div>
-              <p className="text-sm text-gray-700">“{review.comment}”</p>
-            </article>
+                <div className="mb-2 flex items-center gap-1 text-sm">{renderStars(review.rating)}</div>
+                <p className="text-sm text-gray-700">“{review.comment}”</p>
+              </article>
             )
           })}
         </div>
