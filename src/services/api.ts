@@ -12,6 +12,10 @@ interface PublicReviewsResponse {
   stats?: Partial<PublicReviewStats>
 }
 
+interface PublicMetricsResponse {
+  totalVisits?: number
+}
+
 const normalizeProduct = (item: ProductApiResponse): Product => {
   return {
     id: String(item.id ?? item._id ?? ''),
@@ -199,6 +203,30 @@ export const apiService = {
       }
     } catch (error) {
       console.error('Error updating review like:', error)
+      return null
+    }
+  },
+
+  async getPublicMetrics(): Promise<{ totalVisits: number }> {
+    try {
+      const response = await axios.get<PublicMetricsResponse>(`${API_URL}/metrics/public`)
+      return {
+        totalVisits: Number(response.data.totalVisits ?? 0),
+      }
+    } catch (error) {
+      console.error('Error loading public metrics:', error)
+      return { totalVisits: 0 }
+    }
+  },
+
+  async registerVisit(visitorId: string): Promise<{ totalVisits: number } | null> {
+    try {
+      const response = await axios.post<PublicMetricsResponse>(`${API_URL}/metrics/visit`, { visitorId })
+      return {
+        totalVisits: Number(response.data.totalVisits ?? 0),
+      }
+    } catch (error) {
+      console.error('Error registering visit:', error)
       return null
     }
   },

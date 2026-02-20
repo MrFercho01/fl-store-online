@@ -12,6 +12,7 @@ import { isProductEnabled } from '../utils/productStatus'
 import { openWhatsApp } from '../utils/whatsapp'
 
 const VISITOR_ID_STORAGE_KEY = '@fl_store_visitor_id'
+const VISIT_TRACK_STORAGE_KEY = '@fl_store_last_visit_day'
 const PRODUCTS_PER_PAGE = 6
 
 const getOrCreateVisitorId = () => {
@@ -43,6 +44,7 @@ export const HomePage = () => {
     averageRating: 0,
     totalLikes: 0,
   })
+  const [totalVisits, setTotalVisits] = useState(0)
   const [visitorId] = useState(getOrCreateVisitorId)
 
   useEffect(() => {
@@ -75,6 +77,35 @@ export const HomePage = () => {
     }
 
     void fetchReviews()
+
+    return () => {
+      isMounted = false
+    }
+  }, [visitorId])
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadVisits = async () => {
+      const today = new Date().toISOString().slice(0, 10)
+      const lastTrackedDay = localStorage.getItem(VISIT_TRACK_STORAGE_KEY)
+
+      if (visitorId && lastTrackedDay !== today) {
+        const registered = await apiService.registerVisit(visitorId)
+        if (registered && isMounted) {
+          setTotalVisits(registered.totalVisits)
+        }
+        localStorage.setItem(VISIT_TRACK_STORAGE_KEY, today)
+        return
+      }
+
+      const metrics = await apiService.getPublicMetrics()
+      if (isMounted) {
+        setTotalVisits(metrics.totalVisits)
+      }
+    }
+
+    void loadVisits()
 
     return () => {
       isMounted = false
@@ -358,6 +389,9 @@ export const HomePage = () => {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-primary-200 bg-primary-50 px-3 py-1.5 text-sm font-semibold text-primary-700">
+                👁️ {totalVisits} visitas
+              </span>
               <button
                 type="button"
                 onClick={() => handleSortSelect('name')}
