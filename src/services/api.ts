@@ -5,7 +5,7 @@ import type { CreateReviewPayload, PublicReviewStats, Review } from '../types/re
 const API_URL = 'https://fl-store-backend.onrender.com/api'
 
 type ProductApiResponse = Partial<Product> & { _id?: string }
-type ReviewApiResponse = Partial<Review> & { _id?: string }
+type ReviewApiResponse = Partial<Review> & { _id?: string; visitorLikes?: string[] }
 
 interface PublicReviewsResponse {
   reviews: ReviewApiResponse[]
@@ -47,6 +47,9 @@ const normalizeProduct = (item: ProductApiResponse): Product => {
 }
 
 const normalizeReview = (item: ReviewApiResponse): Review => {
+  const visitorLikes = Array.isArray(item.visitorLikes) ? item.visitorLikes : []
+  const computedLikeCount = (Boolean(item.recommend) ? 1 : 0) + visitorLikes.length
+
   return {
     id: String(item.id ?? item._id ?? ''),
     customerName: item.customerName ?? '',
@@ -56,7 +59,7 @@ const normalizeReview = (item: ReviewApiResponse): Review => {
     rating: Number(item.rating ?? 0),
     comment: item.comment ?? '',
     recommend: Boolean(item.recommend),
-    likeCount: Number(item.likeCount ?? 0),
+    likeCount: Number(item.likeCount ?? computedLikeCount),
     likedByVisitor: Boolean(item.likedByVisitor),
     status: (item.status as Review['status']) ?? 'pending',
     createdAt: item.createdAt ?? '',
@@ -181,10 +184,26 @@ export const apiService = {
             .filter((item) => item.status === 'approved')
 
           const publicById = new Map(normalizedPublicReviews.map((item) => [item.id, item]))
+          const adminById = new Map(adminResponse.data.map((item) => [String(item.id ?? item._id ?? ''), item]))
 
           finalReviews = approvedReviews.map((item) => ({
             ...item,
-            likedByVisitor: publicById.get(item.id)?.likedByVisitor ?? item.likedByVisitor,
+            likeCount: (() => {
+              const fromPublic = publicById.get(item.id)?.likeCount
+              if (typeof fromPublic === 'number') return fromPublic
+
+              const rawAdmin = adminById.get(item.id)
+              const visitorLikes = Array.isArray(rawAdmin?.visitorLikes) ? rawAdmin.visitorLikes : []
+              return (item.recommend ? 1 : 0) + visitorLikes.length
+            })(),
+            likedByVisitor: (() => {
+              const fromPublic = publicById.get(item.id)?.likedByVisitor
+              if (typeof fromPublic === 'boolean') return fromPublic
+
+              const rawAdmin = adminById.get(item.id)
+              const visitorLikes = Array.isArray(rawAdmin?.visitorLikes) ? rawAdmin.visitorLikes : []
+              return visitorId ? visitorLikes.includes(visitorId) : false
+            })(),
           }))
         } catch (fallbackError) {
           console.error('Error completing public reviews from admin endpoint:', fallbackError)
