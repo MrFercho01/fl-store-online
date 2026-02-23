@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { StoreFooter } from '../components/StoreFooter'
@@ -7,6 +7,45 @@ import { apiService } from '../services/api'
 import { setProductBannerFlag } from '../utils/bannerSettings'
 
 const NEW_CATEGORY_VALUE = '__new_category__'
+const VISITS_PER_PAGE = 5
+const COMPACT_PAGINATION_LIMIT = 7
+
+type PaginationItem = number | 'ellipsis'
+
+const buildCompactPagination = (currentPage: number, totalPages: number): PaginationItem[] => {
+  if (totalPages <= COMPACT_PAGINATION_LIMIT) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1)
+  }
+
+  const pageSet = new Set<number>([1, totalPages, currentPage, currentPage - 1, currentPage + 1])
+
+  if (currentPage <= 3) {
+    pageSet.add(2)
+    pageSet.add(3)
+    pageSet.add(4)
+  }
+
+  if (currentPage >= totalPages - 2) {
+    pageSet.add(totalPages - 1)
+    pageSet.add(totalPages - 2)
+    pageSet.add(totalPages - 3)
+  }
+
+  const sortedPages = Array.from(pageSet)
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((first, second) => first - second)
+
+  const compactItems: PaginationItem[] = []
+  sortedPages.forEach((page, index) => {
+    const previous = sortedPages[index - 1]
+    if (previous && page - previous > 1) {
+      compactItems.push('ellipsis')
+    }
+    compactItems.push(page)
+  })
+
+  return compactItems
+}
 
 const sortCategories = (items: string[]) => {
   return [...items].sort((first, second) => first.localeCompare(second, 'es', { sensitivity: 'base' }))
@@ -27,10 +66,21 @@ export const AdminPage = () => {
   const [loading, setLoading] = useState(false)
   const [adminMetrics, setAdminMetrics] = useState({
     totalVisits: 0,
+    customerVisits: 0,
+    internalVisits: 0,
     todayVisits: 0,
+    todayCustomerVisits: 0,
     uniqueVisitors: 0,
-    recentVisits: [] as Array<{ visitorId: string; ipAddress: string; lastVisitedAt: string }>,
+    uniqueCustomerVisitors: 0,
+    recentVisits: [] as Array<{
+      visitorId: string
+      ipAddress: string
+      lastVisitedAt: string
+      isInternalVisit: boolean
+      visitSource: 'customer' | 'admin' | 'internal_ip'
+    }>,
   })
+  const [currentVisitsPage, setCurrentVisitsPage] = useState(1)
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -52,6 +102,7 @@ export const AdminPage = () => {
 
       setCategories(sortCategories(Array.from(categoryMap.values())))
       setAdminMetrics(fetchedMetrics)
+      setCurrentVisitsPage(1)
     }
 
     void loadCategories()
@@ -66,6 +117,23 @@ export const AdminPage = () => {
     setPreview('')
     return
   }, [imageFile])
+
+  const totalVisitPages = useMemo(() => {
+    return Math.max(1, Math.ceil(adminMetrics.recentVisits.length / VISITS_PER_PAGE))
+  }, [adminMetrics.recentVisits.length])
+
+  const safeVisitsPage = useMemo(() => {
+    return Math.min(currentVisitsPage, totalVisitPages)
+  }, [currentVisitsPage, totalVisitPages])
+
+  const paginatedVisits = useMemo(() => {
+    const startIndex = (safeVisitsPage - 1) * VISITS_PER_PAGE
+    return adminMetrics.recentVisits.slice(startIndex, startIndex + VISITS_PER_PAGE)
+  }, [adminMetrics.recentVisits, safeVisitsPage])
+
+  const visitPageNumbers = useMemo(() => {
+    return buildCompactPagination(safeVisitsPage, totalVisitPages)
+  }, [safeVisitsPage, totalVisitPages])
 
   const resetForm = () => {
     setName('')
@@ -161,13 +229,29 @@ export const AdminPage = () => {
                 <p className="text-xs font-semibold uppercase tracking-wide text-primary-700">Visitas totales</p>
                 <p className="mt-1 text-2xl font-extrabold text-primary-900">{adminMetrics.totalVisits}</p>
               </div>
+              <div className="rounded-xl border border-emerald-200 bg-white px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Visitas clientes</p>
+                <p className="mt-1 text-2xl font-extrabold text-emerald-800">{adminMetrics.customerVisits}</p>
+              </div>
+              <div className="rounded-xl border border-amber-200 bg-white px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Visitas internas</p>
+                <p className="mt-1 text-2xl font-extrabold text-amber-800">{adminMetrics.internalVisits}</p>
+              </div>
               <div className="rounded-xl border border-primary-200 bg-white px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-primary-700">Visitas hoy</p>
                 <p className="mt-1 text-2xl font-extrabold text-primary-900">{adminMetrics.todayVisits}</p>
               </div>
+              <div className="rounded-xl border border-emerald-200 bg-white px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Clientes hoy</p>
+                <p className="mt-1 text-2xl font-extrabold text-emerald-800">{adminMetrics.todayCustomerVisits}</p>
+              </div>
               <div className="rounded-xl border border-primary-200 bg-white px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-primary-700">Visitantes únicos</p>
                 <p className="mt-1 text-2xl font-extrabold text-primary-900">{adminMetrics.uniqueVisitors}</p>
+              </div>
+              <div className="rounded-xl border border-emerald-200 bg-white px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Únicos clientes</p>
+                <p className="mt-1 text-2xl font-extrabold text-emerald-800">{adminMetrics.uniqueCustomerVisitors}</p>
               </div>
             </div>
 
@@ -176,6 +260,7 @@ export const AdminPage = () => {
                 <thead className="bg-primary-50">
                   <tr>
                     <th className="px-3 py-2 text-left font-semibold text-primary-800">IP</th>
+                    <th className="px-3 py-2 text-left font-semibold text-primary-800">Tipo</th>
                     <th className="px-3 py-2 text-left font-semibold text-primary-800">Visitor ID</th>
                     <th className="px-3 py-2 text-left font-semibold text-primary-800">Última visita</th>
                   </tr>
@@ -183,14 +268,29 @@ export const AdminPage = () => {
                 <tbody className="divide-y divide-primary-100">
                   {adminMetrics.recentVisits.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="px-3 py-4 text-center text-gray-500">
+                      <td colSpan={4} className="px-3 py-4 text-center text-gray-500">
                         Aún no hay visitas registradas
                       </td>
                     </tr>
                   ) : (
-                    adminMetrics.recentVisits.map((visit, index) => (
+                    paginatedVisits.map((visit, index) => (
                       <tr key={`${visit.visitorId}-${visit.lastVisitedAt}-${index}`}>
                         <td className="px-3 py-2 font-medium text-gray-700">{visit.ipAddress || 'N/A'}</td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={`rounded-full px-2 py-1 text-xs font-bold ${
+                              visit.isInternalVisit
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-emerald-100 text-emerald-700'
+                            }`}
+                          >
+                            {visit.visitSource === 'admin'
+                              ? 'ADMIN'
+                              : visit.visitSource === 'internal_ip'
+                                ? 'RED INTERNA'
+                                : 'CLIENTE'}
+                          </span>
+                        </td>
                         <td className="px-3 py-2 text-gray-600">{visit.visitorId || 'N/A'}</td>
                         <td className="px-3 py-2 text-gray-600">
                           {visit.lastVisitedAt
@@ -203,6 +303,56 @@ export const AdminPage = () => {
                 </tbody>
               </table>
             </div>
+
+            {adminMetrics.recentVisits.length > 0 ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-700">
+                <p>
+                  Página {safeVisitsPage} de {totalVisitPages}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentVisitsPage(Math.max(1, safeVisitsPage - 1))}
+                    disabled={safeVisitsPage === 1}
+                    className="rounded-lg border border-primary-300 px-3 py-1.5 font-semibold text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    ← Anterior
+                  </button>
+                  {visitPageNumbers.map((pageItem, index) => {
+                    if (pageItem === 'ellipsis') {
+                      return (
+                        <span key={`ellipsis-${index}`} className="px-1 text-primary-700">
+                          …
+                        </span>
+                      )
+                    }
+
+                    return (
+                      <button
+                        key={pageItem}
+                        type="button"
+                        onClick={() => setCurrentVisitsPage(pageItem)}
+                        className={`rounded-lg border px-3 py-1.5 font-semibold ${
+                          pageItem === safeVisitsPage
+                            ? 'border-primary-600 bg-primary-600 text-white'
+                            : 'border-primary-300 text-primary-700 hover:bg-primary-50'
+                        }`}
+                      >
+                        {pageItem}
+                      </button>
+                    )
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setCurrentVisitsPage(Math.min(totalVisitPages, safeVisitsPage + 1))}
+                    disabled={safeVisitsPage === totalVisitPages}
+                    className="rounded-lg border border-primary-300 px-3 py-1.5 font-semibold text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Siguiente →
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

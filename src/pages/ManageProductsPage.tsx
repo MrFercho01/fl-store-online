@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { StoreFooter } from '../components/StoreFooter'
 import { StoreHeader } from '../components/StoreHeader'
@@ -7,10 +7,53 @@ import type { Product } from '../types/product'
 import { removeProductBannerFlag } from '../utils/bannerSettings'
 import { isProductEnabled, setProductEnabledStatus } from '../utils/productStatus'
 
+const PRODUCTS_PER_PAGE = 4
+const COMPACT_PAGINATION_LIMIT = 7
+
+type PaginationItem = number | 'ellipsis'
+
+const buildCompactPagination = (currentPage: number, totalPages: number): PaginationItem[] => {
+  if (totalPages <= COMPACT_PAGINATION_LIMIT) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1)
+  }
+
+  const pageSet = new Set<number>([1, totalPages, currentPage, currentPage - 1, currentPage + 1])
+
+  if (currentPage <= 3) {
+    pageSet.add(2)
+    pageSet.add(3)
+    pageSet.add(4)
+  }
+
+  if (currentPage >= totalPages - 2) {
+    pageSet.add(totalPages - 1)
+    pageSet.add(totalPages - 2)
+    pageSet.add(totalPages - 3)
+  }
+
+  const sortedPages = Array.from(pageSet)
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((first, second) => first - second)
+
+  const compactItems: PaginationItem[] = []
+  sortedPages.forEach((page, index) => {
+    const previous = sortedPages[index - 1]
+    if (previous && page - previous > 1) {
+      compactItems.push('ellipsis')
+    }
+    compactItems.push(page)
+  })
+
+  return compactItems
+}
+
 export const ManageProductsPage = () => {
   const navigate = useNavigate()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [currentPage, setCurrentPage] = useState(1)
 
   const loadProducts = async () => {
     setLoading(true)
@@ -22,6 +65,56 @@ export const ManageProductsPage = () => {
   useEffect(() => {
     void loadProducts()
   }, [])
+
+  const categories = useMemo(() => {
+    const categoryMap = new Map<string, string>()
+
+    products.forEach((item) => {
+      const categoryValue = item.category.trim()
+      if (!categoryValue) return
+
+      const key = categoryValue.toLowerCase()
+      if (!categoryMap.has(key)) {
+        categoryMap.set(key, categoryValue)
+      }
+    })
+
+    return Array.from(categoryMap.values()).sort((first, second) =>
+      first.localeCompare(second, 'es', { sensitivity: 'base' })
+    )
+  }, [products])
+
+  const filteredProducts = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+    const normalizedCategory = categoryFilter.trim().toLowerCase()
+
+    return products.filter((item) => {
+      const matchesSearch =
+        normalizedSearch.length === 0 ||
+        item.name.toLowerCase().includes(normalizedSearch)
+      const matchesCategory =
+        normalizedCategory === 'all' || item.category.trim().toLowerCase() === normalizedCategory
+
+      return matchesSearch && matchesCategory
+    })
+  }, [products, searchTerm, categoryFilter])
+
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE))
+  }, [filteredProducts.length])
+
+  const safeCurrentPage = useMemo(() => {
+    return Math.min(currentPage, totalPages)
+  }, [currentPage, totalPages])
+
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (safeCurrentPage - 1) * PRODUCTS_PER_PAGE
+    return filteredProducts.slice(startIndex, startIndex + PRODUCTS_PER_PAGE)
+  }, [filteredProducts, safeCurrentPage])
+
+  const productPageNumbers = useMemo(() => {
+    return buildCompactPagination(safeCurrentPage, totalPages)
+  }, [safeCurrentPage, totalPages])
 
   const handleToggleStatus = (product: Product) => {
     const currentlyEnabled = isProductEnabled(product.id)
@@ -62,16 +155,52 @@ export const ManageProductsPage = () => {
             </button>
           </div>
 
+          <div className="mb-5 grid gap-3 md:grid-cols-2">
+            <label className="block">
+              <span className="mb-1 block text-sm font-semibold text-gray-700">Buscar producto</span>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(event) => {
+                  setSearchTerm(event.target.value)
+                  setCurrentPage(1)
+                }}
+                placeholder="Ej: iPhone, audífonos..."
+                className="h-12 w-full rounded-xl border border-gray-300 px-4 text-sm outline-none ring-primary-200 focus:ring"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-sm font-semibold text-gray-700">Filtrar por categoría</span>
+              <select
+                value={categoryFilter}
+                onChange={(event) => {
+                  setCategoryFilter(event.target.value)
+                  setCurrentPage(1)
+                }}
+                className="h-12 w-full rounded-xl border border-gray-300 bg-white px-4 text-sm outline-none ring-primary-200 focus:ring"
+              >
+                <option value="all">Todas</option>
+                {categories.map((category) => (
+                  <option key={category} value={category.toLowerCase()}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
           {loading ? (
             <div className="py-16 text-center text-gray-600">Cargando...</div>
-          ) : products.length === 0 ? (
+          ) : filteredProducts.length === 0 ? (
             <div className="rounded-xl border border-dashed border-gray-300 py-16 text-center">
-              <p className="text-lg font-semibold text-gray-800">No hay productos</p>
-              <p className="mt-2 text-sm text-gray-600">Agrega productos desde el panel admin</p>
+              <p className="text-lg font-semibold text-gray-800">No hay productos para este filtro</p>
+              <p className="mt-2 text-sm text-gray-600">Prueba otra búsqueda o categoría</p>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {products.map((product) => {
+            <>
+              <div className="grid gap-4 md:grid-cols-2">
+                {paginatedProducts.map((product) => {
                 const enabled = isProductEnabled(product.id)
 
                 return (
@@ -119,8 +248,57 @@ export const ManageProductsPage = () => {
                     </div>
                   </article>
                 )
-              })}
-            </div>
+                })}
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-700">
+                <p>
+                  Página {safeCurrentPage} de {totalPages}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))}
+                    disabled={safeCurrentPage === 1}
+                    className="rounded-lg border border-primary-300 px-3 py-1.5 font-semibold text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    ← Anterior
+                  </button>
+                  {productPageNumbers.map((pageItem, index) => {
+                    if (pageItem === 'ellipsis') {
+                      return (
+                        <span key={`ellipsis-${index}`} className="px-1 text-primary-700">
+                          …
+                        </span>
+                      )
+                    }
+
+                    return (
+                      <button
+                        key={pageItem}
+                        type="button"
+                        onClick={() => setCurrentPage(pageItem)}
+                        className={`rounded-lg border px-3 py-1.5 font-semibold ${
+                          pageItem === safeCurrentPage
+                            ? 'border-primary-600 bg-primary-600 text-white'
+                            : 'border-primary-300 text-primary-700 hover:bg-primary-50'
+                        }`}
+                      >
+                        {pageItem}
+                      </button>
+                    )
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(Math.min(totalPages, safeCurrentPage + 1))}
+                    disabled={safeCurrentPage === totalPages}
+                    className="rounded-lg border border-primary-300 px-3 py-1.5 font-semibold text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Siguiente →
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </section>
       </main>

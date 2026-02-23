@@ -5,11 +5,52 @@ import { StoreHeader } from '../components/StoreHeader'
 import { apiService } from '../services/api'
 import type { Review } from '../types/review'
 
+const REVIEWS_PER_PAGE = 5
+const COMPACT_PAGINATION_LIMIT = 7
+
+type PaginationItem = number | 'ellipsis'
+
+const buildCompactPagination = (currentPage: number, totalPages: number): PaginationItem[] => {
+  if (totalPages <= COMPACT_PAGINATION_LIMIT) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1)
+  }
+
+  const pageSet = new Set<number>([1, totalPages, currentPage, currentPage - 1, currentPage + 1])
+
+  if (currentPage <= 3) {
+    pageSet.add(2)
+    pageSet.add(3)
+    pageSet.add(4)
+  }
+
+  if (currentPage >= totalPages - 2) {
+    pageSet.add(totalPages - 1)
+    pageSet.add(totalPages - 2)
+    pageSet.add(totalPages - 3)
+  }
+
+  const sortedPages = Array.from(pageSet)
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((first, second) => first - second)
+
+  const compactItems: PaginationItem[] = []
+  sortedPages.forEach((page, index) => {
+    const previous = sortedPages[index - 1]
+    if (previous && page - previous > 1) {
+      compactItems.push('ellipsis')
+    }
+    compactItems.push(page)
+  })
+
+  return compactItems
+}
+
 export const ManageReviewsPage = () => {
   const navigate = useNavigate()
   const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all')
+  const [currentPage, setCurrentPage] = useState(1)
 
   useEffect(() => {
     let isMounted = true
@@ -32,6 +73,23 @@ export const ManageReviewsPage = () => {
     if (statusFilter === 'all') return reviews
     return reviews.filter((item) => item.status === statusFilter)
   }, [reviews, statusFilter])
+
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(filteredReviews.length / REVIEWS_PER_PAGE))
+  }, [filteredReviews.length])
+
+  const safeCurrentPage = useMemo(() => {
+    return Math.min(currentPage, totalPages)
+  }, [currentPage, totalPages])
+
+  const paginatedReviews = useMemo(() => {
+    const startIndex = (safeCurrentPage - 1) * REVIEWS_PER_PAGE
+    return filteredReviews.slice(startIndex, startIndex + REVIEWS_PER_PAGE)
+  }, [filteredReviews, safeCurrentPage])
+
+  const pageNumbers = useMemo(() => {
+    return buildCompactPagination(safeCurrentPage, totalPages)
+  }, [safeCurrentPage, totalPages])
 
   const handleUpdateStatus = async (review: Review, status: Review['status']) => {
     const updated = await apiService.updateReviewStatus(review.id, status)
@@ -71,7 +129,10 @@ export const ManageReviewsPage = () => {
               <button
                 key={item.key}
                 type="button"
-                onClick={() => setStatusFilter(item.key as typeof statusFilter)}
+                onClick={() => {
+                  setStatusFilter(item.key as typeof statusFilter)
+                  setCurrentPage(1)
+                }}
                 className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
                   statusFilter === item.key
                     ? 'border-primary-600 bg-primary-600 text-white'
@@ -90,8 +151,9 @@ export const ManageReviewsPage = () => {
               <p className="text-lg font-semibold text-gray-800">No hay comentarios para este filtro</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {filteredReviews.map((review) => (
+            <>
+              <div className="space-y-3">
+                {paginatedReviews.map((review) => (
                 <article key={review.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
                   <div className="mb-2 flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
                     <div>
@@ -138,8 +200,57 @@ export const ManageReviewsPage = () => {
                     </button>
                   </div>
                 </article>
-              ))}
-            </div>
+                ))}
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-700">
+                <p>
+                  Página {safeCurrentPage} de {totalPages}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))}
+                    disabled={safeCurrentPage === 1}
+                    className="rounded-lg border border-primary-300 px-3 py-1.5 font-semibold text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    ← Anterior
+                  </button>
+                  {pageNumbers.map((pageItem, index) => {
+                    if (pageItem === 'ellipsis') {
+                      return (
+                        <span key={`ellipsis-${index}`} className="px-1 text-primary-700">
+                          …
+                        </span>
+                      )
+                    }
+
+                    return (
+                      <button
+                        key={pageItem}
+                        type="button"
+                        onClick={() => setCurrentPage(pageItem)}
+                        className={`rounded-lg border px-3 py-1.5 font-semibold ${
+                          pageItem === safeCurrentPage
+                            ? 'border-primary-600 bg-primary-600 text-white'
+                            : 'border-primary-300 text-primary-700 hover:bg-primary-50'
+                        }`}
+                      >
+                        {pageItem}
+                      </button>
+                    )
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(Math.min(totalPages, safeCurrentPage + 1))}
+                    disabled={safeCurrentPage === totalPages}
+                    className="rounded-lg border border-primary-300 px-3 py-1.5 font-semibold text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Siguiente →
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </section>
       </main>

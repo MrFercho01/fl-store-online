@@ -14,16 +14,23 @@ interface PublicReviewsResponse {
 
 interface PublicMetricsResponse {
   totalVisits?: number
+  customerVisits?: number
 }
 
 interface AdminMetricsResponse {
   totalVisits?: number
+  customerVisits?: number
+  internalVisits?: number
   todayVisits?: number
+  todayCustomerVisits?: number
   uniqueVisitors?: number
+  uniqueCustomerVisitors?: number
   recentVisits?: Array<{
     visitorId?: string
     ipAddress?: string
     lastVisitedAt?: string
+    isInternalVisit?: boolean
+    visitSource?: 'customer' | 'admin' | 'internal_ip'
   }>
 }
 
@@ -156,13 +163,37 @@ export const apiService = {
       const response = await axios.get<PublicReviewsResponse>(`${API_URL}/reviews/public`, {
         params: visitorId ? { visitorId } : undefined,
       })
+
+      const normalizedPublicReviews = (response.data.reviews ?? []).map(normalizeReview)
+      const stats = {
+        totalReviews: Number(response.data.stats?.totalReviews ?? 0),
+        averageRating: Number(response.data.stats?.averageRating ?? 0),
+        totalLikes: Number(response.data.stats?.totalLikes ?? 0),
+      }
+
+      let finalReviews = normalizedPublicReviews
+
+      if (stats.totalReviews > normalizedPublicReviews.length) {
+        try {
+          const adminResponse = await axios.get<ReviewApiResponse[]>(`${API_URL}/reviews/admin`)
+          const approvedReviews = adminResponse.data
+            .map(normalizeReview)
+            .filter((item) => item.status === 'approved')
+
+          const publicById = new Map(normalizedPublicReviews.map((item) => [item.id, item]))
+
+          finalReviews = approvedReviews.map((item) => ({
+            ...item,
+            likedByVisitor: publicById.get(item.id)?.likedByVisitor ?? item.likedByVisitor,
+          }))
+        } catch (fallbackError) {
+          console.error('Error completing public reviews from admin endpoint:', fallbackError)
+        }
+      }
+
       return {
-        reviews: (response.data.reviews ?? []).map(normalizeReview),
-        stats: {
-          totalReviews: Number(response.data.stats?.totalReviews ?? 0),
-          averageRating: Number(response.data.stats?.averageRating ?? 0),
-          totalLikes: Number(response.data.stats?.totalLikes ?? 0),
-        },
+        reviews: finalReviews,
+        stats,
       }
     } catch (error) {
       console.error('Error loading public reviews:', error)
@@ -218,23 +249,25 @@ export const apiService = {
     }
   },
 
-  async getPublicMetrics(): Promise<{ totalVisits: number }> {
+  async getPublicMetrics(): Promise<{ totalVisits: number; customerVisits: number }> {
     try {
       const response = await axios.get<PublicMetricsResponse>(`${API_URL}/metrics/public`)
       return {
         totalVisits: Number(response.data.totalVisits ?? 0),
+        customerVisits: Number(response.data.customerVisits ?? response.data.totalVisits ?? 0),
       }
     } catch (error) {
       console.error('Error loading public metrics:', error)
-      return { totalVisits: 0 }
+      return { totalVisits: 0, customerVisits: 0 }
     }
   },
 
-  async registerVisit(visitorId: string): Promise<{ totalVisits: number } | null> {
+  async registerVisit(visitorId: string, isAdminVisit = false): Promise<{ totalVisits: number; customerVisits: number } | null> {
     try {
-      const response = await axios.post<PublicMetricsResponse>(`${API_URL}/metrics/visit`, { visitorId })
+      const response = await axios.post<PublicMetricsResponse>(`${API_URL}/metrics/visit`, { visitorId, isAdminVisit })
       return {
         totalVisits: Number(response.data.totalVisits ?? 0),
+        customerVisits: Number(response.data.customerVisits ?? response.data.totalVisits ?? 0),
       }
     } catch (error) {
       console.error('Error registering visit:', error)
@@ -244,28 +277,48 @@ export const apiService = {
 
   async getAdminMetrics(): Promise<{
     totalVisits: number
+    customerVisits: number
+    internalVisits: number
     todayVisits: number
+    todayCustomerVisits: number
     uniqueVisitors: number
-    recentVisits: Array<{ visitorId: string; ipAddress: string; lastVisitedAt: string }>
+    uniqueCustomerVisitors: number
+    recentVisits: Array<{
+      visitorId: string
+      ipAddress: string
+      lastVisitedAt: string
+      isInternalVisit: boolean
+      visitSource: 'customer' | 'admin' | 'internal_ip'
+    }>
   }> {
     try {
       const response = await axios.get<AdminMetricsResponse>(`${API_URL}/metrics/admin`)
       return {
         totalVisits: Number(response.data.totalVisits ?? 0),
+        customerVisits: Number(response.data.customerVisits ?? response.data.totalVisits ?? 0),
+        internalVisits: Number(response.data.internalVisits ?? 0),
         todayVisits: Number(response.data.todayVisits ?? 0),
+        todayCustomerVisits: Number(response.data.todayCustomerVisits ?? response.data.todayVisits ?? 0),
         uniqueVisitors: Number(response.data.uniqueVisitors ?? 0),
+        uniqueCustomerVisitors: Number(response.data.uniqueCustomerVisitors ?? response.data.uniqueVisitors ?? 0),
         recentVisits: (response.data.recentVisits ?? []).map((item) => ({
           visitorId: String(item.visitorId ?? ''),
           ipAddress: String(item.ipAddress ?? ''),
           lastVisitedAt: String(item.lastVisitedAt ?? ''),
+          isInternalVisit: Boolean(item.isInternalVisit),
+          visitSource: (item.visitSource ?? 'customer') as 'customer' | 'admin' | 'internal_ip',
         })),
       }
     } catch (error) {
       console.error('Error loading admin metrics:', error)
       return {
         totalVisits: 0,
+        customerVisits: 0,
+        internalVisits: 0,
         todayVisits: 0,
+        todayCustomerVisits: 0,
         uniqueVisitors: 0,
+        uniqueCustomerVisitors: 0,
         recentVisits: [],
       }
     }

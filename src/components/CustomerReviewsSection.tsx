@@ -14,8 +14,84 @@ interface CustomerReviewsSectionProps {
 }
 
 const DEFAULT_REVIEW_RATING = 5
+const COMMENTS_PER_PAGE = 4
+const COMPACT_PAGINATION_LIMIT = 7
+
+type PaginationItem = number | 'ellipsis'
+
+const buildCompactPagination = (currentPage: number, totalPages: number): PaginationItem[] => {
+  if (totalPages <= COMPACT_PAGINATION_LIMIT) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1)
+  }
+
+  const pageSet = new Set<number>([1, totalPages, currentPage, currentPage - 1, currentPage + 1])
+
+  if (currentPage <= 3) {
+    pageSet.add(2)
+    pageSet.add(3)
+    pageSet.add(4)
+  }
+
+  if (currentPage >= totalPages - 2) {
+    pageSet.add(totalPages - 1)
+    pageSet.add(totalPages - 2)
+    pageSet.add(totalPages - 3)
+  }
+
+  const sortedPages = Array.from(pageSet)
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((first, second) => first - second)
+
+  const compactItems: PaginationItem[] = []
+  sortedPages.forEach((page, index) => {
+    const previous = sortedPages[index - 1]
+    if (previous && page - previous > 1) {
+      compactItems.push('ellipsis')
+    }
+    compactItems.push(page)
+  })
+
+  return compactItems
+}
 
 const normalizeCategory = (value: string) => value.trim().toLowerCase()
+
+const getDateValue = (value: string) => {
+  const parsed = new Date(value).getTime()
+  return Number.isNaN(parsed) ? 0 : parsed
+}
+
+const prioritizeReviews = (reviews: Review[]): Review[] => {
+  if (reviews.length <= 1) return [...reviews]
+
+  const topRated = [...reviews]
+    .sort((first, second) => {
+      const byRating = second.rating - first.rating
+      if (byRating !== 0) return byRating
+      return getDateValue(second.createdAt) - getDateValue(first.createdAt)
+    })
+    .slice(0, 2)
+
+  const lowRated = [...reviews]
+    .sort((first, second) => {
+      const byRating = first.rating - second.rating
+      if (byRating !== 0) return byRating
+      return getDateValue(second.createdAt) - getDateValue(first.createdAt)
+    })
+    .slice(0, 2)
+
+  const featured = [...topRated, ...lowRated].reduce<Review[]>((accumulator, current) => {
+    if (accumulator.some((item) => item.id === current.id)) return accumulator
+    accumulator.push(current)
+    return accumulator
+  }, [])
+
+  const remaining = reviews
+    .filter((review) => !featured.some((item) => item.id === review.id))
+    .sort((first, second) => getDateValue(second.createdAt) - getDateValue(first.createdAt))
+
+  return [...featured, ...remaining]
+}
 
 const renderStars = (rating: number) => {
   return '★★★★★'.split('').map((star, index) => (
@@ -43,6 +119,7 @@ export const CustomerReviewsSection = ({
   const [comment, setComment] = useState('')
   const [recommend, setRecommend] = useState(true)
   const [likingReviewId, setLikingReviewId] = useState('')
+  const [currentReviewsPage, setCurrentReviewsPage] = useState(1)
   const [reviewLikeOverrides, setReviewLikeOverrides] = useState<Record<string, { likeCount: number; likedByVisitor: boolean }>>({})
   const openPopupButtonRef = useRef<HTMLButtonElement | null>(null)
   const popupContainerRef = useRef<HTMLDivElement | null>(null)
@@ -79,7 +156,7 @@ export const CustomerReviewsSection = ({
   }, [isPopupOpen])
 
   const displayedReviews = useMemo(() => {
-    return reviews.map((review) => {
+    const withLikes = reviews.map((review) => {
       const override = reviewLikeOverrides[review.id]
       if (!override) return review
 
@@ -89,6 +166,8 @@ export const CustomerReviewsSection = ({
         likedByVisitor: override.likedByVisitor,
       }
     })
+
+    return prioritizeReviews(withLikes)
   }, [reviews, reviewLikeOverrides])
 
   const displayedTotalLikes = useMemo(() => {
@@ -96,6 +175,23 @@ export const CustomerReviewsSection = ({
     const newTotal = displayedReviews.reduce((sum, review) => sum + review.likeCount, 0)
     return totalLikes + (newTotal - originalTotal)
   }, [reviews, displayedReviews, totalLikes])
+
+  const totalReviewPages = useMemo(() => {
+    return Math.max(1, Math.ceil(displayedReviews.length / COMMENTS_PER_PAGE))
+  }, [displayedReviews.length])
+
+  const safeReviewsPage = useMemo(() => {
+    return Math.min(currentReviewsPage, totalReviewPages)
+  }, [currentReviewsPage, totalReviewPages])
+
+  const paginatedReviews = useMemo(() => {
+    const startIndex = (safeReviewsPage - 1) * COMMENTS_PER_PAGE
+    return displayedReviews.slice(startIndex, startIndex + COMMENTS_PER_PAGE)
+  }, [displayedReviews, safeReviewsPage])
+
+  const reviewPageNumbers = useMemo(() => {
+    return buildCompactPagination(safeReviewsPage, totalReviewPages)
+  }, [safeReviewsPage, totalReviewPages])
 
   const categories = useMemo(() => {
     const map = new Map<string, string>()
@@ -218,8 +314,9 @@ export const CustomerReviewsSection = ({
           <p className="mt-1 text-xs text-gray-600">Sé el primero en compartir tu experiencia de compra.</p>
         </div>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
-          {displayedReviews.map((review) => {
+        <>
+          <div className="grid gap-3 md:grid-cols-2">
+            {paginatedReviews.map((review) => {
             const isLikedByVisitor = review.likedByVisitor
             const reviewLikes = review.likeCount
             const isUpdatingLike = likingReviewId === review.id
@@ -254,8 +351,57 @@ export const CustomerReviewsSection = ({
                 <p className="text-sm text-gray-700">“{review.comment}”</p>
               </article>
             )
-          })}
-        </div>
+            })}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-gray-700">
+            <p>
+              Mostrando {paginatedReviews.length} de {displayedReviews.length} comentarios · Página {safeReviewsPage} de {totalReviewPages}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentReviewsPage(Math.max(1, safeReviewsPage - 1))}
+                disabled={safeReviewsPage === 1}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                ← Anterior
+              </button>
+              {reviewPageNumbers.map((pageItem, index) => {
+                if (pageItem === 'ellipsis') {
+                  return (
+                    <span key={`ellipsis-${index}`} className="px-1 text-gray-700">
+                      …
+                    </span>
+                  )
+                }
+
+                return (
+                  <button
+                    key={pageItem}
+                    type="button"
+                    onClick={() => setCurrentReviewsPage(pageItem)}
+                    className={`rounded-lg border px-3 py-1.5 font-semibold ${
+                      pageItem === safeReviewsPage
+                        ? 'border-primary-600 bg-primary-600 text-white'
+                        : 'border-gray-300 bg-white text-gray-700 hover:border-primary-400 hover:text-primary-700'
+                    }`}
+                  >
+                    {pageItem}
+                  </button>
+                )
+              })}
+              <button
+                type="button"
+                onClick={() => setCurrentReviewsPage(Math.min(totalReviewPages, safeReviewsPage + 1))}
+                disabled={safeReviewsPage === totalReviewPages}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Siguiente →
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       {isPopupOpen && (

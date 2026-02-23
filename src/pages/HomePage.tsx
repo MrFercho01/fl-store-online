@@ -89,11 +89,12 @@ export const HomePage = () => {
     const loadVisits = async () => {
       const today = new Date().toISOString().slice(0, 10)
       const lastTrackedDay = localStorage.getItem(VISIT_TRACK_STORAGE_KEY)
+      const isAdminVisit = localStorage.getItem('@fl_store_auth') === 'true'
 
       if (visitorId && lastTrackedDay !== today) {
-        const registered = await apiService.registerVisit(visitorId)
+        const registered = await apiService.registerVisit(visitorId, isAdminVisit)
         if (registered && isMounted) {
-          setTotalVisits(registered.totalVisits)
+          setTotalVisits(registered.customerVisits)
         }
         localStorage.setItem(VISIT_TRACK_STORAGE_KEY, today)
         return
@@ -101,7 +102,7 @@ export const HomePage = () => {
 
       const metrics = await apiService.getPublicMetrics()
       if (isMounted) {
-        setTotalVisits(metrics.totalVisits)
+        setTotalVisits(metrics.customerVisits)
       }
     }
 
