@@ -323,4 +323,44 @@ export const apiService = {
       }
     }
   },
+
+  async recalculateAdminMetrics(): Promise<{
+    totalVisits: number
+    customerVisits: number
+    internalVisits: number
+    todayVisits: number
+    todayCustomerVisits: number
+    uniqueVisitors: number
+    uniqueCustomerVisitors: number
+    recentVisits: Array<{
+      visitorId: string
+      ipAddress: string
+      lastVisitedAt: string
+      isInternalVisit: boolean
+      visitSource: 'customer' | 'admin' | 'internal_ip'
+    }>
+  } | null> {
+    try {
+      const response = await axios.post<AdminMetricsResponse & { message?: string }>(`${API_URL}/metrics/admin/recalculate`)
+      return {
+        totalVisits: Number(response.data.totalVisits ?? 0),
+        customerVisits: Number(response.data.customerVisits ?? response.data.totalVisits ?? 0),
+        internalVisits: Number(response.data.internalVisits ?? 0),
+        todayVisits: Number(response.data.todayVisits ?? 0),
+        todayCustomerVisits: Number(response.data.todayCustomerVisits ?? response.data.todayVisits ?? 0),
+        uniqueVisitors: Number(response.data.uniqueVisitors ?? 0),
+        uniqueCustomerVisitors: Number(response.data.uniqueCustomerVisitors ?? 0),
+        recentVisits: (response.data.recentVisits ?? []).map((item) => ({
+          visitorId: String(item.visitorId ?? ''),
+          ipAddress: String(item.ipAddress ?? ''),
+          lastVisitedAt: String(item.lastVisitedAt ?? ''),
+          isInternalVisit: Boolean(item.isInternalVisit),
+          visitSource: (item.visitSource ?? 'customer') as 'customer' | 'admin' | 'internal_ip',
+        })),
+      }
+    } catch (error) {
+      console.error('Error recalculating admin metrics:', error)
+      return null
+    }
+  },
 }

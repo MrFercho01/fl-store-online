@@ -64,6 +64,7 @@ export const AdminPage = () => {
   const [isNew, setIsNew] = useState(true)
   const [showInBanner, setShowInBanner] = useState(true)
   const [loading, setLoading] = useState(false)
+  const [recalculatingMetrics, setRecalculatingMetrics] = useState(false)
   const [adminMetrics, setAdminMetrics] = useState({
     totalVisits: 0,
     customerVisits: 0,
@@ -204,6 +205,24 @@ export const AdminPage = () => {
     navigate('/login', { replace: true })
   }
 
+  const handleRecalculateMetrics = async () => {
+    const confirmed = window.confirm('¿Deseas recalcular el histórico de métricas de visitas ahora?')
+    if (!confirmed) return
+
+    setRecalculatingMetrics(true)
+    const recalculated = await apiService.recalculateAdminMetrics()
+    setRecalculatingMetrics(false)
+
+    if (!recalculated) {
+      window.alert('No se pudo recalcular métricas. Intenta nuevamente.')
+      return
+    }
+
+    setAdminMetrics(recalculated)
+    setCurrentVisitsPage(1)
+    window.alert('Métricas históricas recalculadas correctamente')
+  }
+
   return (
     <div className="min-h-screen bg-linear-to-b from-primary-900 via-primary-700 to-primary-500">
       <StoreHeader subtitle="Panel de administrador" />
@@ -222,7 +241,17 @@ export const AdminPage = () => {
           </div>
 
           <div className="mb-6 space-y-3 rounded-2xl border border-primary-100 bg-primary-50/60 p-4">
-            <h2 className="text-lg font-bold text-primary-900">Métricas de visitas</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-lg font-bold text-primary-900">Métricas de visitas</h2>
+              <button
+                type="button"
+                onClick={() => void handleRecalculateMetrics()}
+                disabled={recalculatingMetrics}
+                className="rounded-lg border border-primary-500 bg-white px-3 py-1.5 text-xs font-semibold text-primary-700 hover:bg-primary-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {recalculatingMetrics ? 'Recalculando...' : '♻️ Recalcular histórico'}
+              </button>
+            </div>
 
             <div className="grid gap-3 md:grid-cols-3">
               <div className="rounded-xl border border-primary-200 bg-white px-4 py-3">
