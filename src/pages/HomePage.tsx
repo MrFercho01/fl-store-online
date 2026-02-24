@@ -207,7 +207,11 @@ export const HomePage = () => {
       }
     })
 
-    return ['Todas', ...Array.from(categoryMap.values())]
+    const sortedCategories = Array.from(categoryMap.values()).sort((first, second) =>
+      first.localeCompare(second, 'es', { sensitivity: 'base' })
+    )
+
+    return ['Todas', ...sortedCategories]
   }, [visibleProducts])
 
   const normalizedSelectedCategory = useMemo(() => {
