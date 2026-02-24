@@ -83,12 +83,23 @@ export const AdminPage = () => {
     }>,
   })
   const [currentVisitsPage, setCurrentVisitsPage] = useState(1)
+  const [pushTokenStats, setPushTokenStats] = useState({
+    totalTokens: 0,
+    activeTokens: 0,
+    activeByPlatform: {
+      android: 0,
+      ios: 0,
+      web: 0,
+    },
+    lastSeenAt: null as string | null,
+  })
 
   useEffect(() => {
     const loadCategories = async () => {
-      const [fetchedProducts, fetchedMetrics] = await Promise.all([
+      const [fetchedProducts, fetchedMetrics, fetchedPushStats] = await Promise.all([
         apiService.getProducts(),
         apiService.getAdminMetrics(),
+        apiService.getPushTokenStats(),
       ])
       const categoryMap = new Map<string, string>()
 
@@ -104,6 +115,9 @@ export const AdminPage = () => {
 
       setCategories(sortCategories(Array.from(categoryMap.values())))
       setAdminMetrics(fetchedMetrics)
+      if (fetchedPushStats) {
+        setPushTokenStats(fetchedPushStats)
+      }
       setCurrentVisitsPage(1)
     }
 
@@ -286,6 +300,13 @@ export const AdminPage = () => {
               <div className="rounded-xl border border-sky-200 bg-white px-4 py-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Descargas APK Android</p>
                 <p className="mt-1 text-2xl font-extrabold text-sky-800">{adminMetrics.apkDownloads}</p>
+              </div>
+              <div className="rounded-xl border border-fuchsia-200 bg-white px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-fuchsia-700">Tokens Push Activos</p>
+                <p className="mt-1 text-2xl font-extrabold text-fuchsia-800">{pushTokenStats.activeTokens}</p>
+                <p className="mt-1 text-xs text-fuchsia-700">
+                  Android: {pushTokenStats.activeByPlatform.android} · iOS: {pushTokenStats.activeByPlatform.ios}
+                </p>
               </div>
             </div>
 

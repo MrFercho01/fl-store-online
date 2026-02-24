@@ -42,6 +42,17 @@ interface MobileApkInfoResponse {
   fileName?: string
 }
 
+interface PushStatsResponse {
+  totalTokens?: number
+  activeTokens?: number
+  activeByPlatform?: {
+    android?: number
+    ios?: number
+    web?: number
+  }
+  lastSeenAt?: string | null
+}
+
 const normalizeProduct = (item: ProductApiResponse): Product => {
   return {
     id: String(item.id ?? item._id ?? ''),
@@ -407,6 +418,30 @@ export const apiService = {
       }
     } catch (error) {
       console.error('Error loading mobile apk info:', error)
+      return null
+    }
+  },
+
+  async getPushTokenStats(): Promise<{
+    totalTokens: number
+    activeTokens: number
+    activeByPlatform: { android: number; ios: number; web: number }
+    lastSeenAt: string | null
+  } | null> {
+    try {
+      const response = await axios.get<PushStatsResponse>(`${API_URL}/mobile/push/stats`)
+      return {
+        totalTokens: Number(response.data.totalTokens ?? 0),
+        activeTokens: Number(response.data.activeTokens ?? 0),
+        activeByPlatform: {
+          android: Number(response.data.activeByPlatform?.android ?? 0),
+          ios: Number(response.data.activeByPlatform?.ios ?? 0),
+          web: Number(response.data.activeByPlatform?.web ?? 0),
+        },
+        lastSeenAt: response.data.lastSeenAt ? String(response.data.lastSeenAt) : null,
+      }
+    } catch (error) {
+      console.error('Error loading push token stats:', error)
       return null
     }
   },
