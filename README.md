@@ -1,5 +1,23 @@
 # React + TypeScript + Vite
 
+## Variables de entorno para instalación móvil
+
+Puedes configurar los enlaces de instalación directa (sin Expo) en el home:
+
+- `VITE_MOBILE_ANDROID_APK_URL`: URL pública del archivo `.apk` (opcional). Si no existe, usa `http://<host-web>:3000/downloads/fl-store-mobile.apk`.
+- `VITE_BACKEND_PUBLIC_PORT`: puerto del backend para el fallback local del APK (por defecto `3000`).
+
+Ejemplo en `.env`:
+
+```env
+VITE_MOBILE_ANDROID_APK_URL=https://tu-dominio.com/downloads/fl-store-latest.apk
+VITE_BACKEND_PUBLIC_PORT=3000
+```
+
+## iOS (próximamente)
+
+En iPhone no se puede instalar APK. Para instalación iOS debes usar TestFlight/App Store con cuenta Apple Developer.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

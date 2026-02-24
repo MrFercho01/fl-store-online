@@ -19,6 +19,7 @@ interface PublicMetricsResponse {
 
 interface AdminMetricsResponse {
   totalVisits?: number
+  apkDownloads?: number
   customerVisits?: number
   internalVisits?: number
   todayVisits?: number
@@ -32,6 +33,13 @@ interface AdminMetricsResponse {
     isInternalVisit?: boolean
     visitSource?: 'customer' | 'admin' | 'internal_ip'
   }>
+}
+
+interface MobileApkInfoResponse {
+  available?: boolean
+  downloadCount?: number
+  downloadUrl?: string
+  fileName?: string
 }
 
 const normalizeProduct = (item: ProductApiResponse): Product => {
@@ -296,6 +304,7 @@ export const apiService = {
 
   async getAdminMetrics(): Promise<{
     totalVisits: number
+    apkDownloads: number
     customerVisits: number
     internalVisits: number
     todayVisits: number
@@ -314,6 +323,7 @@ export const apiService = {
       const response = await axios.get<AdminMetricsResponse>(`${API_URL}/metrics/admin`)
       return {
         totalVisits: Number(response.data.totalVisits ?? 0),
+        apkDownloads: Number(response.data.apkDownloads ?? 0),
         customerVisits: Number(response.data.customerVisits ?? response.data.totalVisits ?? 0),
         internalVisits: Number(response.data.internalVisits ?? 0),
         todayVisits: Number(response.data.todayVisits ?? 0),
@@ -332,6 +342,7 @@ export const apiService = {
       console.error('Error loading admin metrics:', error)
       return {
         totalVisits: 0,
+        apkDownloads: 0,
         customerVisits: 0,
         internalVisits: 0,
         todayVisits: 0,
@@ -345,6 +356,7 @@ export const apiService = {
 
   async recalculateAdminMetrics(): Promise<{
     totalVisits: number
+    apkDownloads: number
     customerVisits: number
     internalVisits: number
     todayVisits: number
@@ -363,6 +375,7 @@ export const apiService = {
       const response = await axios.post<AdminMetricsResponse & { message?: string }>(`${API_URL}/metrics/admin/recalculate`)
       return {
         totalVisits: Number(response.data.totalVisits ?? 0),
+        apkDownloads: Number(response.data.apkDownloads ?? 0),
         customerVisits: Number(response.data.customerVisits ?? response.data.totalVisits ?? 0),
         internalVisits: Number(response.data.internalVisits ?? 0),
         todayVisits: Number(response.data.todayVisits ?? 0),
@@ -379,6 +392,20 @@ export const apiService = {
       }
     } catch (error) {
       console.error('Error recalculating admin metrics:', error)
+      return null
+    }
+  },
+
+  async getMobileApkInfo(): Promise<{ available: boolean; downloadCount: number; downloadUrl: string } | null> {
+    try {
+      const response = await axios.get<MobileApkInfoResponse>(`${API_URL}/mobile/apk-info`)
+      return {
+        available: Boolean(response.data.available),
+        downloadCount: Number(response.data.downloadCount ?? 0),
+        downloadUrl: String(response.data.downloadUrl ?? ''),
+      }
+    } catch (error) {
+      console.error('Error loading mobile apk info:', error)
       return null
     }
   },

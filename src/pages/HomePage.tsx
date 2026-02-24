@@ -14,6 +14,16 @@ import { openWhatsApp } from '../utils/whatsapp'
 const VISITOR_ID_STORAGE_KEY = '@fl_store_visitor_id'
 const VISIT_TRACK_STORAGE_KEY = '@fl_store_last_visit_day'
 const PRODUCTS_PER_PAGE = 6
+const ECUADOR_TIMEZONE = 'America/Guayaquil'
+
+const getEcuadorDayKey = () => {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: ECUADOR_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+}
 
 const getOrCreateVisitorId = () => {
   let currentVisitorId = localStorage.getItem(VISITOR_ID_STORAGE_KEY)
@@ -45,7 +55,17 @@ export const HomePage = () => {
     totalLikes: 0,
   })
   const [totalVisits, setTotalVisits] = useState(0)
+  const [backendAndroidApkUrl, setBackendAndroidApkUrl] = useState('')
+  const [backendApkAvailable, setBackendApkAvailable] = useState(false)
   const [visitorId] = useState(getOrCreateVisitorId)
+
+  const configuredAndroidApkUrl = String(import.meta.env.VITE_MOBILE_ANDROID_APK_URL ?? '').trim()
+  const androidApkUrl = configuredAndroidApkUrl || backendAndroidApkUrl
+  const hasAndroidApkUrl = androidApkUrl.length > 0 && (configuredAndroidApkUrl.length > 0 || backendApkAvailable)
+
+  const openExternalLink = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -86,8 +106,28 @@ export const HomePage = () => {
   useEffect(() => {
     let isMounted = true
 
+    const loadApkInfo = async () => {
+      const apkInfo = await apiService.getMobileApkInfo()
+      if (!apkInfo || !isMounted) return
+
+      setBackendApkAvailable(Boolean(apkInfo.available))
+      if (apkInfo.downloadUrl) {
+        setBackendAndroidApkUrl(String(apkInfo.downloadUrl))
+      }
+    }
+
+    void loadApkInfo()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    let isMounted = true
+
     const loadVisits = async () => {
-      const today = new Date().toISOString().slice(0, 10)
+      const today = getEcuadorDayKey()
       const lastTrackedDay = localStorage.getItem(VISIT_TRACK_STORAGE_KEY)
       const isAdminVisit = localStorage.getItem('@fl_store_auth') === 'true'
 
@@ -486,6 +526,29 @@ export const HomePage = () => {
             onReviewSent={loadPublicReviews}
             visitorId={visitorId}
           />
+
+          <section className="mt-6 rounded-2xl border border-primary-200 bg-primary-50/70 p-4 shadow-sm md:p-5">
+            <h2 className="mb-3 text-xl font-extrabold text-slate-900">Instalar app</h2>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => openExternalLink(androidApkUrl)}
+                disabled={!hasAndroidApkUrl}
+                className="group rounded-xl border border-gray-200 bg-white p-2 text-left transition hover:border-primary-300 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <img src="/android-download.svg" alt="Descargar en Android" className="h-16 w-full rounded-lg object-cover" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => window.alert('iOS próximamente.')}
+                className="group rounded-xl border border-gray-200 bg-white p-2 text-left transition hover:border-amber-300"
+              >
+                <img src="/ios-soon.svg" alt="iOS próximamente" className="h-16 w-full rounded-lg object-cover" />
+              </button>
+            </div>
+          </section>
         </section>
       </main>
 

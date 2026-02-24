@@ -67,6 +67,7 @@ export const AdminPage = () => {
   const [recalculatingMetrics, setRecalculatingMetrics] = useState(false)
   const [adminMetrics, setAdminMetrics] = useState({
     totalVisits: 0,
+    apkDownloads: 0,
     customerVisits: 0,
     internalVisits: 0,
     todayVisits: 0,
@@ -282,6 +283,10 @@ export const AdminPage = () => {
                 <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Únicos clientes</p>
                 <p className="mt-1 text-2xl font-extrabold text-emerald-800">{adminMetrics.uniqueCustomerVisitors}</p>
               </div>
+              <div className="rounded-xl border border-sky-200 bg-white px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Descargas APK Android</p>
+                <p className="mt-1 text-2xl font-extrabold text-sky-800">{adminMetrics.apkDownloads}</p>
+              </div>
             </div>
 
             <div className="overflow-x-auto rounded-xl border border-primary-200 bg-white">
@@ -323,7 +328,10 @@ export const AdminPage = () => {
                         <td className="px-3 py-2 text-gray-600">{visit.visitorId || 'N/A'}</td>
                         <td className="px-3 py-2 text-gray-600">
                           {visit.lastVisitedAt
-                            ? new Date(visit.lastVisitedAt).toLocaleString('es-EC')
+                            ? new Date(visit.lastVisitedAt).toLocaleString('es-EC', {
+                                timeZone: 'America/Guayaquil',
+                                hour12: false,
+                              })
                             : 'N/A'}
                         </td>
                       </tr>
