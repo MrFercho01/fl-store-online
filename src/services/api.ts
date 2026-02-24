@@ -100,6 +100,15 @@ const getAuthHeaders = () => {
   }
 }
 
+const getRequiredAuthHeaders = (operation: string) => {
+  const headers = getAuthHeaders()
+  if (!headers) {
+    throw new Error(`No hay token de administrador para ${operation}`)
+  }
+
+  return headers
+}
+
 export const authService = {
   setToken(token: string) {
     localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token)
@@ -141,7 +150,7 @@ export const apiService = {
   async addProduct(product: Omit<Product, 'id'>): Promise<Product | null> {
     try {
       const response = await axios.post<ProductApiResponse>(`${API_URL}/products`, product, {
-        headers: getAuthHeaders(),
+        headers: getRequiredAuthHeaders('agregar producto'),
       })
       return normalizeProduct(response.data)
     } catch (error) {
@@ -180,10 +189,7 @@ export const apiService = {
       formData.append('image', file)
 
       const response = await axios.post<{ url: string }>(`${API_URL}/upload`, formData, {
-        headers: {
-          ...getAuthHeaders(),
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: getRequiredAuthHeaders('subir imagen'),
       })
 
       return response.data.url
