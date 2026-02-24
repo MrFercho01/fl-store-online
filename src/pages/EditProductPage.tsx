@@ -235,7 +235,7 @@ export const EditProductPage = () => {
                   <input
                     value={price}
                     onChange={(event) => setPrice(event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none ring-primary-200 focus:ring"
+                    className="h-12 w-full rounded-xl border border-gray-300 px-4 text-sm outline-none ring-primary-200 focus:ring"
                   />
                 </label>
 
@@ -244,7 +244,7 @@ export const EditProductPage = () => {
                   <select
                     value={selectedCategory}
                     onChange={(event) => setSelectedCategory(event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none ring-primary-200 focus:ring"
+                    className="h-12 w-full rounded-xl border border-gray-300 bg-white px-4 text-sm outline-none ring-primary-200 focus:ring"
                   >
                     <option value="">Selecciona una categoría</option>
                     {categories.map((item) => (
