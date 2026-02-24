@@ -5,7 +5,6 @@ import { StoreHeader } from '../components/StoreHeader'
 import { apiService } from '../services/api'
 import type { Product } from '../types/product'
 import { removeProductBannerFlag } from '../utils/bannerSettings'
-import { isProductEnabled, setProductEnabledStatus } from '../utils/productStatus'
 
 const PRODUCTS_PER_PAGE = 4
 const COMPACT_PAGINATION_LIMIT = 7
@@ -116,26 +115,40 @@ export const ManageProductsPage = () => {
     return buildCompactPagination(safeCurrentPage, totalPages)
   }, [safeCurrentPage, totalPages])
 
-  const handleToggleStatus = (product: Product) => {
-    const currentlyEnabled = isProductEnabled(product.id)
+  const handleToggleStatus = async (product: Product) => {
+    const currentlyEnabled = product.isEnabled !== false
 
     if (currentlyEnabled) {
       const confirmed = window.confirm(`¿Deseas deshabilitar "${product.name}" de la tienda?`)
       if (!confirmed) return
 
-      setProductEnabledStatus(product.id, false)
+      const updated = await apiService.updateProduct(product.id, {
+        ...product,
+        isEnabled: false,
+      })
+      if (!updated) {
+        window.alert('No se pudo deshabilitar el producto')
+        return
+      }
       removeProductBannerFlag(product.id)
       window.alert('Producto deshabilitado correctamente')
-      setProducts((prev) => [...prev])
+      setProducts((prev) => prev.map((item) => (item.id === product.id ? updated : item)))
       return
     }
 
     const confirmed = window.confirm(`¿Deseas volver a habilitar "${product.name}"?`)
     if (!confirmed) return
 
-    setProductEnabledStatus(product.id, true)
+    const updated = await apiService.updateProduct(product.id, {
+      ...product,
+      isEnabled: true,
+    })
+    if (!updated) {
+      window.alert('No se pudo habilitar el producto')
+      return
+    }
     window.alert('Producto habilitado correctamente')
-    setProducts((prev) => [...prev])
+    setProducts((prev) => prev.map((item) => (item.id === product.id ? updated : item)))
   }
 
   return (
@@ -201,7 +214,7 @@ export const ManageProductsPage = () => {
             <>
               <div className="grid gap-4 md:grid-cols-2">
                 {paginatedProducts.map((product) => {
-                const enabled = isProductEnabled(product.id)
+                const enabled = product.isEnabled !== false
 
                 return (
                   <article key={product.id} className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">

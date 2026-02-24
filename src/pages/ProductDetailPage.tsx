@@ -4,7 +4,6 @@ import { StoreFooter } from '../components/StoreFooter'
 import { StoreHeader } from '../components/StoreHeader'
 import { apiService } from '../services/api'
 import type { Product } from '../types/product'
-import { isProductEnabled } from '../utils/productStatus'
 import { openWhatsApp } from '../utils/whatsapp'
 
 const features = [
@@ -29,7 +28,7 @@ export const ProductDetailPage = () => {
       setLoading(true)
       const fetchedProduct = await apiService.getProductById(id)
 
-      if (!fetchedProduct || !isProductEnabled(fetchedProduct.id)) {
+      if (!fetchedProduct || fetchedProduct.isEnabled === false) {
         setProduct(null)
         setLoading(false)
         return

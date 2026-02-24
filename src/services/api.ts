@@ -51,6 +51,7 @@ const normalizeProduct = (item: ProductApiResponse): Product => {
     image: item.image ?? '',
     category: item.category ?? '',
     isNew: Boolean(item.isNew),
+    isEnabled: item.isEnabled !== false,
   }
 }
 

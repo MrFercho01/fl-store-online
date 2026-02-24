@@ -6,4 +6,5 @@ export interface Product {
   image: string
   category: string
   isNew: boolean
+  isEnabled?: boolean
 }

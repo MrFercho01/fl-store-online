@@ -8,7 +8,6 @@ import { apiService } from '../services/api'
 import type { Product } from '../types/product'
 import type { Review } from '../types/review'
 import { getProductBannerFlag } from '../utils/bannerSettings'
-import { isProductEnabled } from '../utils/productStatus'
 import { openWhatsApp } from '../utils/whatsapp'
 
 const VISITOR_ID_STORAGE_KEY = '@fl_store_visitor_id'
@@ -154,7 +153,7 @@ export const HomePage = () => {
   }, [visitorId])
 
   const visibleProducts = useMemo(() => {
-    return products.filter((item) => isProductEnabled(item.id))
+    return products.filter((item) => item.isEnabled !== false)
   }, [products])
 
   const categories = useMemo(() => {
