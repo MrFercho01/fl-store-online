@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { StoreFooter } from '../components/StoreFooter'
 import { StoreHeader } from '../components/StoreHeader'
-import { apiService } from '../services/api'
+import { apiService, authService } from '../services/api'
 import { setProductBannerFlag } from '../utils/bannerSettings'
 
 const NEW_CATEGORY_VALUE = '__new_category__'
@@ -216,7 +216,7 @@ export const AdminPage = () => {
   }
 
   const logout = () => {
-    localStorage.removeItem('@fl_store_auth')
+    authService.clearToken()
     navigate('/login', { replace: true })
   }
 

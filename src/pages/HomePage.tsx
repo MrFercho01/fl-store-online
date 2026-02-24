@@ -4,7 +4,7 @@ import { CustomerReviewsSection } from '../components/CustomerReviewsSection'
 import { ProductCard } from '../components/ProductCard'
 import { StoreFooter } from '../components/StoreFooter'
 import { StoreHeader } from '../components/StoreHeader'
-import { apiService } from '../services/api'
+import { apiService, authService } from '../services/api'
 import type { Product } from '../types/product'
 import type { Review } from '../types/review'
 import { getProductBannerFlag } from '../utils/bannerSettings'
@@ -128,7 +128,7 @@ export const HomePage = () => {
     const loadVisits = async () => {
       const today = getEcuadorDayKey()
       const lastTrackedDay = localStorage.getItem(VISIT_TRACK_STORAGE_KEY)
-      const isAdminVisit = localStorage.getItem('@fl_store_auth') === 'true'
+      const isAdminVisit = authService.hasToken()
 
       if (visitorId && lastTrackedDay !== today) {
         const registered = await apiService.registerVisit(visitorId, isAdminVisit)

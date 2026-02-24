@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { authService } from '../services/api'
 
 interface StoreHeaderProps {
   subtitle: string
@@ -25,7 +26,7 @@ export const StoreHeader = ({ subtitle, onLogoLongPress }: StoreHeaderProps) => 
   }, [])
 
   useEffect(() => {
-    const isAuthenticated = localStorage.getItem('@fl_store_auth') === 'true'
+    const isAuthenticated = authService.hasToken()
     setIsAdmin(isAuthenticated)
     setWelcomeText(isAuthenticated ? 'Bienvenido Admin' : 'Bienvenido cliente')
     setIsAdminMenuOpen(false)
@@ -80,7 +81,7 @@ export const StoreHeader = ({ subtitle, onLogoLongPress }: StoreHeaderProps) => 
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('@fl_store_auth')
+    authService.clearToken()
     setIsAdmin(false)
     setIsAdminMenuOpen(false)
     setWelcomeText('Bienvenido cliente')

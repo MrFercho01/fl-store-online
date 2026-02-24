@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { StoreFooter } from '../components/StoreFooter'
 import { StoreHeader } from '../components/StoreHeader'
-import { apiService } from '../services/api'
+import { apiService, authService } from '../services/api'
 
 export const LoginPage = () => {
   const navigate = useNavigate()
@@ -20,11 +20,11 @@ export const LoginPage = () => {
     }
 
     setLoading(true)
-    const success = await apiService.login(username, password)
+    const token = await apiService.login(username, password)
     setLoading(false)
 
-    if (success) {
-      localStorage.setItem('@fl_store_auth', 'true')
+    if (token) {
+      authService.setToken(token)
       navigate('/admin', { replace: true })
       return
     }

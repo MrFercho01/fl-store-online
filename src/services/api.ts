@@ -3,6 +3,7 @@ import type { Product } from '../types/product'
 import type { CreateReviewPayload, PublicReviewStats, Review } from '../types/review'
 
 const API_URL = 'https://fl-store-backend.onrender.com/api'
+export const AUTH_TOKEN_STORAGE_KEY = '@fl_store_admin_token'
 
 type ProductApiResponse = Partial<Product> & { _id?: string }
 type ReviewApiResponse = Partial<Review> & { _id?: string; visitorLikes?: string[] }
@@ -86,6 +87,33 @@ const normalizeReview = (item: ReviewApiResponse): Review => {
   }
 }
 
+const getAuthToken = (): string => {
+  return String(localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || '').trim()
+}
+
+const getAuthHeaders = () => {
+  const token = getAuthToken()
+  if (!token) return undefined
+
+  return {
+    Authorization: `Bearer ${token}`,
+  }
+}
+
+export const authService = {
+  setToken(token: string) {
+    localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token)
+    localStorage.setItem('@fl_store_auth', 'true')
+  },
+  clearToken() {
+    localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY)
+    localStorage.removeItem('@fl_store_auth')
+  },
+  hasToken() {
+    return Boolean(getAuthToken())
+  },
+}
+
 export const apiService = {
   async getProducts(): Promise<Product[]> {
     try {
@@ -112,7 +140,9 @@ export const apiService = {
 
   async addProduct(product: Omit<Product, 'id'>): Promise<Product | null> {
     try {
-      const response = await axios.post<ProductApiResponse>(`${API_URL}/products`, product)
+      const response = await axios.post<ProductApiResponse>(`${API_URL}/products`, product, {
+        headers: getAuthHeaders(),
+      })
       return normalizeProduct(response.data)
     } catch (error) {
       console.error('Error adding product:', error)
@@ -122,7 +152,9 @@ export const apiService = {
 
   async updateProduct(id: string, product: Product): Promise<Product | null> {
     try {
-      const response = await axios.put<ProductApiResponse>(`${API_URL}/products/${id}`, product)
+      const response = await axios.put<ProductApiResponse>(`${API_URL}/products/${id}`, product, {
+        headers: getAuthHeaders(),
+      })
       return normalizeProduct(response.data)
     } catch (error) {
       console.error('Error updating product:', error)
@@ -132,7 +164,9 @@ export const apiService = {
 
   async deleteProduct(id: string): Promise<boolean> {
     try {
-      await axios.delete(`${API_URL}/products/${id}`)
+      await axios.delete(`${API_URL}/products/${id}`, {
+        headers: getAuthHeaders(),
+      })
       return true
     } catch (error) {
       console.error('Error deleting product:', error)
@@ -147,6 +181,7 @@ export const apiService = {
 
       const response = await axios.post<{ url: string }>(`${API_URL}/upload`, formData, {
         headers: {
+          ...getAuthHeaders(),
           'Content-Type': 'multipart/form-data',
         },
       })
@@ -158,16 +193,20 @@ export const apiService = {
     }
   },
 
-  async login(username: string, password: string): Promise<boolean> {
+  async login(username: string, password: string): Promise<string | null> {
     try {
-      const response = await axios.post<{ success: boolean }>(`${API_URL}/login`, {
+      const response = await axios.post<{ success: boolean; token?: string }>(`${API_URL}/login`, {
         username,
         password,
       })
-      return response.data.success
+      if (!response.data.success || !response.data.token) {
+        return null
+      }
+
+      return response.data.token
     } catch (error) {
       console.error('Error in login:', error)
-      return false
+      return null
     }
   },
 
@@ -194,44 +233,8 @@ export const apiService = {
         totalLikes: Number(response.data.stats?.totalLikes ?? 0),
       }
 
-      let finalReviews = normalizedPublicReviews
-
-      if (stats.totalReviews > normalizedPublicReviews.length) {
-        try {
-          const adminResponse = await axios.get<ReviewApiResponse[]>(`${API_URL}/reviews/admin`)
-          const approvedReviews = adminResponse.data
-            .map(normalizeReview)
-            .filter((item) => item.status === 'approved')
-
-          const publicById = new Map(normalizedPublicReviews.map((item) => [item.id, item]))
-          const adminById = new Map(adminResponse.data.map((item) => [String(item.id ?? item._id ?? ''), item]))
-
-          finalReviews = approvedReviews.map((item) => ({
-            ...item,
-            likeCount: (() => {
-              const fromPublic = publicById.get(item.id)?.likeCount
-              if (typeof fromPublic === 'number') return fromPublic
-
-              const rawAdmin = adminById.get(item.id)
-              const visitorLikes = Array.isArray(rawAdmin?.visitorLikes) ? rawAdmin.visitorLikes : []
-              return (item.recommend ? 1 : 0) + visitorLikes.length
-            })(),
-            likedByVisitor: (() => {
-              const fromPublic = publicById.get(item.id)?.likedByVisitor
-              if (typeof fromPublic === 'boolean') return fromPublic
-
-              const rawAdmin = adminById.get(item.id)
-              const visitorLikes = Array.isArray(rawAdmin?.visitorLikes) ? rawAdmin.visitorLikes : []
-              return visitorId ? visitorLikes.includes(visitorId) : false
-            })(),
-          }))
-        } catch (fallbackError) {
-          console.error('Error completing public reviews from admin endpoint:', fallbackError)
-        }
-      }
-
       return {
-        reviews: finalReviews,
+        reviews: normalizedPublicReviews,
         stats,
       }
     } catch (error) {
@@ -249,7 +252,9 @@ export const apiService = {
 
   async getAdminReviews(): Promise<Review[]> {
     try {
-      const response = await axios.get<ReviewApiResponse[]>(`${API_URL}/reviews/admin`)
+      const response = await axios.get<ReviewApiResponse[]>(`${API_URL}/reviews/admin`, {
+        headers: getAuthHeaders(),
+      })
       return response.data.map(normalizeReview)
     } catch (error) {
       console.error('Error loading admin reviews:', error)
@@ -259,7 +264,9 @@ export const apiService = {
 
   async updateReviewStatus(id: string, status: Review['status']): Promise<Review | null> {
     try {
-      const response = await axios.patch<ReviewApiResponse>(`${API_URL}/reviews/${id}/status`, { status })
+      const response = await axios.patch<ReviewApiResponse>(`${API_URL}/reviews/${id}/status`, { status }, {
+        headers: getAuthHeaders(),
+      })
       return normalizeReview(response.data)
     } catch (error) {
       console.error('Error updating review status:', error)
@@ -332,7 +339,9 @@ export const apiService = {
     }>
   }> {
     try {
-      const response = await axios.get<AdminMetricsResponse>(`${API_URL}/metrics/admin`)
+      const response = await axios.get<AdminMetricsResponse>(`${API_URL}/metrics/admin`, {
+        headers: getAuthHeaders(),
+      })
       return {
         totalVisits: Number(response.data.totalVisits ?? 0),
         apkDownloads: Number(response.data.apkDownloads ?? 0),
@@ -384,7 +393,9 @@ export const apiService = {
     }>
   } | null> {
     try {
-      const response = await axios.post<AdminMetricsResponse & { message?: string }>(`${API_URL}/metrics/admin/recalculate`)
+      const response = await axios.post<AdminMetricsResponse & { message?: string }>(`${API_URL}/metrics/admin/recalculate`, null, {
+        headers: getAuthHeaders(),
+      })
       return {
         totalVisits: Number(response.data.totalVisits ?? 0),
         apkDownloads: Number(response.data.apkDownloads ?? 0),
@@ -429,7 +440,9 @@ export const apiService = {
     lastSeenAt: string | null
   } | null> {
     try {
-      const response = await axios.get<PushStatsResponse>(`${API_URL}/mobile/push/stats`)
+      const response = await axios.get<PushStatsResponse>(`${API_URL}/mobile/push/stats`, {
+        headers: getAuthHeaders(),
+      })
       return {
         totalTokens: Number(response.data.totalTokens ?? 0),
         activeTokens: Number(response.data.activeTokens ?? 0),
