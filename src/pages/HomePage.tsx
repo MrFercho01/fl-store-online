@@ -14,6 +14,44 @@ const VISITOR_ID_STORAGE_KEY = '@fl_store_visitor_id'
 const VISIT_TRACK_STORAGE_KEY = '@fl_store_last_visit_day'
 const PRODUCTS_PER_PAGE = 6
 const ECUADOR_TIMEZONE = 'America/Guayaquil'
+const COMPACT_PAGINATION_LIMIT = 7
+
+type PaginationItem = number | 'ellipsis'
+
+const buildCompactPagination = (currentPage: number, totalPages: number): PaginationItem[] => {
+  if (totalPages <= COMPACT_PAGINATION_LIMIT) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1)
+  }
+
+  const pageSet = new Set<number>([1, totalPages, currentPage, currentPage - 1, currentPage + 1])
+
+  if (currentPage <= 3) {
+    pageSet.add(2)
+    pageSet.add(3)
+    pageSet.add(4)
+  }
+
+  if (currentPage >= totalPages - 2) {
+    pageSet.add(totalPages - 1)
+    pageSet.add(totalPages - 2)
+    pageSet.add(totalPages - 3)
+  }
+
+  const sortedPages = Array.from(pageSet)
+    .filter((page) => page >= 1 && page <= totalPages)
+    .sort((first, second) => first - second)
+
+  const compactItems: PaginationItem[] = []
+  sortedPages.forEach((page, index) => {
+    const previous = sortedPages[index - 1]
+    if (previous && page - previous > 1) {
+      compactItems.push('ellipsis')
+    }
+    compactItems.push(page)
+  })
+
+  return compactItems
+}
 
 const getEcuadorDayKey = () => {
   return new Intl.DateTimeFormat('en-CA', {
@@ -216,6 +254,10 @@ export const HomePage = () => {
     const endIndex = startIndex + PRODUCTS_PER_PAGE
     return sortedProducts.slice(startIndex, endIndex)
   }, [sortedProducts, safeCurrentPage])
+
+  const productPageNumbers = useMemo(() => {
+    return buildCompactPagination(safeCurrentPage, totalPages)
+  }, [safeCurrentPage, totalPages])
 
   useEffect(() => {
     if (!showSortInfo) return
@@ -488,20 +530,30 @@ export const HomePage = () => {
                     Anterior
                   </button>
 
-                  {Array.from({ length: totalPages }, (_, index) => index + 1).map((page) => (
-                    <button
-                      key={page}
-                      type="button"
-                      onClick={() => setCurrentPage(page)}
-                      className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                        safeCurrentPage === page
-                          ? 'bg-primary-600 text-white'
-                          : 'border border-gray-300 text-gray-700 hover:border-primary-500 hover:text-primary-600'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
+                  {productPageNumbers.map((pageItem, index) => {
+                    if (pageItem === 'ellipsis') {
+                      return (
+                        <span key={`ellipsis-${index}`} className="px-1 text-primary-700">
+                          …
+                        </span>
+                      )
+                    }
+
+                    return (
+                      <button
+                        key={pageItem}
+                        type="button"
+                        onClick={() => setCurrentPage(pageItem)}
+                        className={`rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                          safeCurrentPage === pageItem
+                            ? 'bg-primary-600 text-white'
+                            : 'border border-gray-300 text-gray-700 hover:border-primary-500 hover:text-primary-600'
+                        }`}
+                      >
+                        {pageItem}
+                      </button>
+                    )
+                  })}
 
                   <button
                     type="button"
