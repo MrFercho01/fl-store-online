@@ -161,6 +161,7 @@ export const apiService = {
       })
       return normalizeProduct(response.data)
     } catch (error) {
+      handleAdminUnauthorized(error)
       console.error('Error adding product:', error)
       return null
     }

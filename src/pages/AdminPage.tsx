@@ -114,9 +114,14 @@ export const AdminPage = () => {
       ])
 
       if (!fetchedMetrics) {
-        window.alert('Tu sesión expiró. Inicia sesión nuevamente.')
-        authService.clearToken()
-        navigate('/login', { replace: true })
+        if (!authService.hasToken()) {
+          window.alert('Tu sesión expiró. Inicia sesión nuevamente.')
+          authService.clearToken()
+          navigate('/login', { replace: true })
+          return
+        }
+
+        window.alert('No se pudo cargar métricas en este momento. Intenta nuevamente.')
         return
       }
 
@@ -204,6 +209,12 @@ export const AdminPage = () => {
     const uploadedImage = await apiService.uploadImage(imageFile)
     if (!uploadedImage) {
       setLoading(false)
+      if (!authService.hasToken()) {
+        window.alert('Tu sesión expiró. Inicia sesión nuevamente.')
+        logout()
+        return
+      }
+
       window.alert('No se pudo subir la imagen')
       return
     }
@@ -219,6 +230,12 @@ export const AdminPage = () => {
 
     setLoading(false)
     if (!response) {
+      if (!authService.hasToken()) {
+        window.alert('Tu sesión expiró. Inicia sesión nuevamente.')
+        logout()
+        return
+      }
+
       window.alert('No se pudo agregar el producto')
       return
     }
