@@ -93,6 +93,11 @@ export const AdminPage = () => {
     },
     lastSeenAt: null as string | null,
   })
+  const [mobileApkInfo, setMobileApkInfo] = useState<{
+    available: boolean
+    downloadCount: number
+    downloadUrl: string
+  } | null>(null)
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -101,10 +106,11 @@ export const AdminPage = () => {
         return
       }
 
-      const [fetchedProducts, fetchedMetrics, fetchedPushStats] = await Promise.all([
+      const [fetchedProducts, fetchedMetrics, fetchedPushStats, fetchedApkInfo] = await Promise.all([
         apiService.getProducts(),
         apiService.getAdminMetrics(),
         apiService.getPushTokenStats(),
+        apiService.getMobileApkInfo(),
       ])
 
       if (!fetchedMetrics) {
@@ -131,6 +137,7 @@ export const AdminPage = () => {
       if (fetchedPushStats) {
         setPushTokenStats(fetchedPushStats)
       }
+      setMobileApkInfo(fetchedApkInfo)
       setCurrentVisitsPage(1)
     }
 
@@ -327,6 +334,30 @@ export const AdminPage = () => {
                   Android: {pushTokenStats.activeByPlatform.android} · iOS: {pushTokenStats.activeByPlatform.ios}
                 </p>
               </div>
+            </div>
+
+            <div className="rounded-xl border border-sky-200 bg-white p-4">
+              <p className="text-sm font-bold text-sky-800">Instalar APK Android en celular</p>
+              <p className="mt-1 text-xs text-sky-700">
+                Descarga directa para compartir o abrir desde tu teléfono.
+              </p>
+              {mobileApkInfo?.available ? (
+                <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <a
+                    href={mobileApkInfo.downloadUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center justify-center rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700"
+                  >
+                    📲 Descargar APK Android
+                  </a>
+                  <p className="text-xs text-sky-700">Descargas registradas: {mobileApkInfo.downloadCount}</p>
+                </div>
+              ) : (
+                <p className="mt-3 text-xs font-semibold text-amber-700">
+                  Aún no hay APK disponible en el backend para descarga.
+                </p>
+              )}
             </div>
 
             <div className="overflow-x-auto rounded-xl border border-primary-200 bg-white">
