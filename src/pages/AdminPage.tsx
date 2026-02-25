@@ -96,11 +96,24 @@ export const AdminPage = () => {
 
   useEffect(() => {
     const loadCategories = async () => {
+      if (!authService.hasToken()) {
+        navigate('/login', { replace: true })
+        return
+      }
+
       const [fetchedProducts, fetchedMetrics, fetchedPushStats] = await Promise.all([
         apiService.getProducts(),
         apiService.getAdminMetrics(),
         apiService.getPushTokenStats(),
       ])
+
+      if (!fetchedMetrics) {
+        window.alert('Tu sesión expiró. Inicia sesión nuevamente.')
+        authService.clearToken()
+        navigate('/login', { replace: true })
+        return
+      }
+
       const categoryMap = new Map<string, string>()
 
       fetchedProducts.forEach((item) => {
@@ -229,6 +242,12 @@ export const AdminPage = () => {
     setRecalculatingMetrics(false)
 
     if (!recalculated) {
+      if (!authService.hasToken()) {
+        window.alert('Tu sesión expiró. Inicia sesión nuevamente.')
+        logout()
+        return
+      }
+
       window.alert('No se pudo recalcular métricas. Intenta nuevamente.')
       return
     }

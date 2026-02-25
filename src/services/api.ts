@@ -269,10 +269,11 @@ export const apiService = {
   async getAdminReviews(): Promise<Review[]> {
     try {
       const response = await axios.get<ReviewApiResponse[]>(`${API_URL}/reviews/admin`, {
-        headers: getAuthHeaders(),
+        headers: getRequiredAuthHeaders('obtener reseñas administrativas'),
       })
       return response.data.map(normalizeReview)
     } catch (error) {
+      handleAdminUnauthorized(error)
       console.error('Error loading admin reviews:', error)
       return []
     }
@@ -281,10 +282,11 @@ export const apiService = {
   async updateReviewStatus(id: string, status: Review['status']): Promise<Review | null> {
     try {
       const response = await axios.patch<ReviewApiResponse>(`${API_URL}/reviews/${id}/status`, { status }, {
-        headers: getAuthHeaders(),
+        headers: getRequiredAuthHeaders('actualizar estado de reseña'),
       })
       return normalizeReview(response.data)
     } catch (error) {
+      handleAdminUnauthorized(error)
       console.error('Error updating review status:', error)
       return null
     }
@@ -353,10 +355,10 @@ export const apiService = {
       isInternalVisit: boolean
       visitSource: 'customer' | 'admin' | 'internal_ip'
     }>
-  }> {
+  } | null> {
     try {
       const response = await axios.get<AdminMetricsResponse>(`${API_URL}/metrics/admin`, {
-        headers: getAuthHeaders(),
+        headers: getRequiredAuthHeaders('obtener métricas administrativas'),
       })
       return {
         totalVisits: Number(response.data.totalVisits ?? 0),
@@ -376,18 +378,9 @@ export const apiService = {
         })),
       }
     } catch (error) {
+      handleAdminUnauthorized(error)
       console.error('Error loading admin metrics:', error)
-      return {
-        totalVisits: 0,
-        apkDownloads: 0,
-        customerVisits: 0,
-        internalVisits: 0,
-        todayVisits: 0,
-        todayCustomerVisits: 0,
-        uniqueVisitors: 0,
-        uniqueCustomerVisitors: 0,
-        recentVisits: [],
-      }
+      return null
     }
   },
 
@@ -410,7 +403,7 @@ export const apiService = {
   } | null> {
     try {
       const response = await axios.post<AdminMetricsResponse & { message?: string }>(`${API_URL}/metrics/admin/recalculate`, null, {
-        headers: getAuthHeaders(),
+        headers: getRequiredAuthHeaders('recalcular métricas administrativas'),
       })
       return {
         totalVisits: Number(response.data.totalVisits ?? 0),
@@ -430,6 +423,7 @@ export const apiService = {
         })),
       }
     } catch (error) {
+      handleAdminUnauthorized(error)
       console.error('Error recalculating admin metrics:', error)
       return null
     }
@@ -457,7 +451,7 @@ export const apiService = {
   } | null> {
     try {
       const response = await axios.get<PushStatsResponse>(`${API_URL}/mobile/push/stats`, {
-        headers: getAuthHeaders(),
+        headers: getRequiredAuthHeaders('obtener estadísticas push'),
       })
       return {
         totalTokens: Number(response.data.totalTokens ?? 0),
@@ -470,6 +464,7 @@ export const apiService = {
         lastSeenAt: response.data.lastSeenAt ? String(response.data.lastSeenAt) : null,
       }
     } catch (error) {
+      handleAdminUnauthorized(error)
       console.error('Error loading push token stats:', error)
       return null
     }
