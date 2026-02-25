@@ -123,6 +123,13 @@ export const authService = {
   },
 }
 
+const handleAdminUnauthorized = (error: unknown) => {
+  if (!axios.isAxiosError(error)) return
+  if (error.response?.status !== 401) return
+
+  authService.clearToken()
+}
+
 export const apiService = {
   async getProducts(): Promise<Product[]> {
     try {
@@ -162,10 +169,11 @@ export const apiService = {
   async updateProduct(id: string, product: Product): Promise<Product | null> {
     try {
       const response = await axios.put<ProductApiResponse>(`${API_URL}/products/${id}`, product, {
-        headers: getAuthHeaders(),
+        headers: getRequiredAuthHeaders('actualizar producto'),
       })
       return normalizeProduct(response.data)
     } catch (error) {
+      handleAdminUnauthorized(error)
       console.error('Error updating product:', error)
       return null
     }
@@ -174,10 +182,11 @@ export const apiService = {
   async deleteProduct(id: string): Promise<boolean> {
     try {
       await axios.delete(`${API_URL}/products/${id}`, {
-        headers: getAuthHeaders(),
+        headers: getRequiredAuthHeaders('deshabilitar producto'),
       })
       return true
     } catch (error) {
+      handleAdminUnauthorized(error)
       console.error('Error deleting product:', error)
       return false
     }
@@ -194,6 +203,7 @@ export const apiService = {
 
       return response.data.url
     } catch (error) {
+      handleAdminUnauthorized(error)
       console.error('Error uploading image:', error)
       return null
     }
