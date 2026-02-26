@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { usePaginationLimit } from '../hooks/usePaginationLimit'
 import { apiService } from '../services/api'
 import type { Product } from '../types/product'
 import type { Review } from '../types/review'
+import { buildCompactPagination } from '../utils/pagination'
 
 interface CustomerReviewsSectionProps {
   products: Product[]
@@ -15,44 +17,6 @@ interface CustomerReviewsSectionProps {
 
 const DEFAULT_REVIEW_RATING = 5
 const COMMENTS_PER_PAGE = 4
-const COMPACT_PAGINATION_LIMIT = 7
-
-type PaginationItem = number | 'ellipsis'
-
-const buildCompactPagination = (currentPage: number, totalPages: number): PaginationItem[] => {
-  if (totalPages <= COMPACT_PAGINATION_LIMIT) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1)
-  }
-
-  const pageSet = new Set<number>([1, totalPages, currentPage, currentPage - 1, currentPage + 1])
-
-  if (currentPage <= 3) {
-    pageSet.add(2)
-    pageSet.add(3)
-    pageSet.add(4)
-  }
-
-  if (currentPage >= totalPages - 2) {
-    pageSet.add(totalPages - 1)
-    pageSet.add(totalPages - 2)
-    pageSet.add(totalPages - 3)
-  }
-
-  const sortedPages = Array.from(pageSet)
-    .filter((page) => page >= 1 && page <= totalPages)
-    .sort((first, second) => first - second)
-
-  const compactItems: PaginationItem[] = []
-  sortedPages.forEach((page, index) => {
-    const previous = sortedPages[index - 1]
-    if (previous && page - previous > 1) {
-      compactItems.push('ellipsis')
-    }
-    compactItems.push(page)
-  })
-
-  return compactItems
-}
 
 const normalizeCategory = (value: string) => value.trim().toLowerCase()
 
@@ -110,6 +74,7 @@ export const CustomerReviewsSection = ({
   onReviewSent,
   visitorId,
 }: CustomerReviewsSectionProps) => {
+  const paginationLimit = usePaginationLimit()
   const [isPopupOpen, setIsPopupOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [customerName, setCustomerName] = useState('')
@@ -190,8 +155,8 @@ export const CustomerReviewsSection = ({
   }, [displayedReviews, safeReviewsPage])
 
   const reviewPageNumbers = useMemo(() => {
-    return buildCompactPagination(safeReviewsPage, totalReviewPages)
-  }, [safeReviewsPage, totalReviewPages])
+    return buildCompactPagination(safeReviewsPage, totalReviewPages, paginationLimit)
+  }, [paginationLimit, safeReviewsPage, totalReviewPages])
 
   const categories = useMemo(() => {
     const map = new Map<string, string>()
@@ -358,14 +323,15 @@ export const CustomerReviewsSection = ({
             <p>
               Mostrando {paginatedReviews.length} de {displayedReviews.length} comentarios · Página {safeReviewsPage} de {totalReviewPages}
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 justify-end">
               <button
                 type="button"
                 onClick={() => setCurrentReviewsPage(Math.max(1, safeReviewsPage - 1))}
                 disabled={safeReviewsPage === 1}
                 className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                ← Anterior
+                <span className="sm:hidden">←</span>
+                <span className="hidden sm:inline">← Anterior</span>
               </button>
               {reviewPageNumbers.map((pageItem, index) => {
                 if (pageItem === 'ellipsis') {
@@ -397,7 +363,8 @@ export const CustomerReviewsSection = ({
                 disabled={safeReviewsPage === totalReviewPages}
                 className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 font-semibold text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Siguiente →
+                <span className="sm:hidden">→</span>
+                <span className="hidden sm:inline">Siguiente →</span>
               </button>
             </div>
           </div>

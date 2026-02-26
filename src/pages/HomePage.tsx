@@ -7,6 +7,8 @@ import { StoreHeader } from '../components/StoreHeader'
 import { apiService, authService } from '../services/api'
 import type { Product } from '../types/product'
 import type { Review } from '../types/review'
+import { usePaginationLimit } from '../hooks/usePaginationLimit'
+import { buildCompactPagination } from '../utils/pagination'
 import { getProductBannerFlag } from '../utils/bannerSettings'
 import { openWhatsApp } from '../utils/whatsapp'
 
@@ -14,44 +16,6 @@ const VISITOR_ID_STORAGE_KEY = '@fl_store_visitor_id'
 const VISIT_TRACK_STORAGE_KEY = '@fl_store_last_visit_day'
 const PRODUCTS_PER_PAGE = 6
 const ECUADOR_TIMEZONE = 'America/Guayaquil'
-const COMPACT_PAGINATION_LIMIT = 7
-
-type PaginationItem = number | 'ellipsis'
-
-const buildCompactPagination = (currentPage: number, totalPages: number): PaginationItem[] => {
-  if (totalPages <= COMPACT_PAGINATION_LIMIT) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1)
-  }
-
-  const pageSet = new Set<number>([1, totalPages, currentPage, currentPage - 1, currentPage + 1])
-
-  if (currentPage <= 3) {
-    pageSet.add(2)
-    pageSet.add(3)
-    pageSet.add(4)
-  }
-
-  if (currentPage >= totalPages - 2) {
-    pageSet.add(totalPages - 1)
-    pageSet.add(totalPages - 2)
-    pageSet.add(totalPages - 3)
-  }
-
-  const sortedPages = Array.from(pageSet)
-    .filter((page) => page >= 1 && page <= totalPages)
-    .sort((first, second) => first - second)
-
-  const compactItems: PaginationItem[] = []
-  sortedPages.forEach((page, index) => {
-    const previous = sortedPages[index - 1]
-    if (previous && page - previous > 1) {
-      compactItems.push('ellipsis')
-    }
-    compactItems.push(page)
-  })
-
-  return compactItems
-}
 
 const getEcuadorDayKey = () => {
   return new Intl.DateTimeFormat('en-CA', {
@@ -74,6 +38,7 @@ const getOrCreateVisitorId = () => {
 }
 
 export const HomePage = () => {
+  const paginationLimit = usePaginationLimit()
   const navigate = useNavigate()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -260,8 +225,8 @@ export const HomePage = () => {
   }, [sortedProducts, safeCurrentPage])
 
   const productPageNumbers = useMemo(() => {
-    return buildCompactPagination(safeCurrentPage, totalPages)
-  }, [safeCurrentPage, totalPages])
+    return buildCompactPagination(safeCurrentPage, totalPages, paginationLimit)
+  }, [paginationLimit, safeCurrentPage, totalPages])
 
   useEffect(() => {
     if (!showSortInfo) return
@@ -531,7 +496,8 @@ export const HomePage = () => {
                     onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
                     className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary-500 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Anterior
+                    <span className="sm:hidden">←</span>
+                    <span className="hidden sm:inline">Anterior</span>
                   </button>
 
                   {productPageNumbers.map((pageItem, index) => {
@@ -565,7 +531,8 @@ export const HomePage = () => {
                     onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
                     className="rounded-xl border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary-500 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Siguiente
+                    <span className="sm:hidden">→</span>
+                    <span className="hidden sm:inline">Siguiente</span>
                   </button>
                 </div>
               )}

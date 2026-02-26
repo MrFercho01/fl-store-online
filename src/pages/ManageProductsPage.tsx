@@ -1,52 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { usePaginationLimit } from '../hooks/usePaginationLimit'
 import { StoreFooter } from '../components/StoreFooter'
 import { StoreHeader } from '../components/StoreHeader'
 import { apiService } from '../services/api'
 import type { Product } from '../types/product'
+import { buildCompactPagination } from '../utils/pagination'
 import { removeProductBannerFlag } from '../utils/bannerSettings'
 
 const PRODUCTS_PER_PAGE = 4
-const COMPACT_PAGINATION_LIMIT = 7
-
-type PaginationItem = number | 'ellipsis'
-
-const buildCompactPagination = (currentPage: number, totalPages: number): PaginationItem[] => {
-  if (totalPages <= COMPACT_PAGINATION_LIMIT) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1)
-  }
-
-  const pageSet = new Set<number>([1, totalPages, currentPage, currentPage - 1, currentPage + 1])
-
-  if (currentPage <= 3) {
-    pageSet.add(2)
-    pageSet.add(3)
-    pageSet.add(4)
-  }
-
-  if (currentPage >= totalPages - 2) {
-    pageSet.add(totalPages - 1)
-    pageSet.add(totalPages - 2)
-    pageSet.add(totalPages - 3)
-  }
-
-  const sortedPages = Array.from(pageSet)
-    .filter((page) => page >= 1 && page <= totalPages)
-    .sort((first, second) => first - second)
-
-  const compactItems: PaginationItem[] = []
-  sortedPages.forEach((page, index) => {
-    const previous = sortedPages[index - 1]
-    if (previous && page - previous > 1) {
-      compactItems.push('ellipsis')
-    }
-    compactItems.push(page)
-  })
-
-  return compactItems
-}
 
 export const ManageProductsPage = () => {
+  const paginationLimit = usePaginationLimit()
   const navigate = useNavigate()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -112,8 +77,8 @@ export const ManageProductsPage = () => {
   }, [filteredProducts, safeCurrentPage])
 
   const productPageNumbers = useMemo(() => {
-    return buildCompactPagination(safeCurrentPage, totalPages)
-  }, [safeCurrentPage, totalPages])
+    return buildCompactPagination(safeCurrentPage, totalPages, paginationLimit)
+  }, [paginationLimit, safeCurrentPage, totalPages])
 
   const handleToggleStatus = async (product: Product) => {
     const currentlyEnabled = product.isEnabled !== false
@@ -268,14 +233,15 @@ export const ManageProductsPage = () => {
                 <p>
                   Página {safeCurrentPage} de {totalPages}
                 </p>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 justify-end">
                   <button
                     type="button"
                     onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))}
                     disabled={safeCurrentPage === 1}
                     className="rounded-lg border border-primary-300 px-3 py-1.5 font-semibold text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    ← Anterior
+                    <span className="sm:hidden">←</span>
+                    <span className="hidden sm:inline">← Anterior</span>
                   </button>
                   {productPageNumbers.map((pageItem, index) => {
                     if (pageItem === 'ellipsis') {
@@ -307,7 +273,8 @@ export const ManageProductsPage = () => {
                     disabled={safeCurrentPage === totalPages}
                     className="rounded-lg border border-primary-300 px-3 py-1.5 font-semibold text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Siguiente →
+                    <span className="sm:hidden">→</span>
+                    <span className="hidden sm:inline">Siguiente →</span>
                   </button>
                 </div>
               </div>

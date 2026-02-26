@@ -1,51 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { usePaginationLimit } from '../hooks/usePaginationLimit'
 import { StoreFooter } from '../components/StoreFooter'
 import { StoreHeader } from '../components/StoreHeader'
 import { apiService } from '../services/api'
 import type { Review } from '../types/review'
+import { buildCompactPagination } from '../utils/pagination'
 
 const REVIEWS_PER_PAGE = 5
-const COMPACT_PAGINATION_LIMIT = 7
-
-type PaginationItem = number | 'ellipsis'
-
-const buildCompactPagination = (currentPage: number, totalPages: number): PaginationItem[] => {
-  if (totalPages <= COMPACT_PAGINATION_LIMIT) {
-    return Array.from({ length: totalPages }, (_, index) => index + 1)
-  }
-
-  const pageSet = new Set<number>([1, totalPages, currentPage, currentPage - 1, currentPage + 1])
-
-  if (currentPage <= 3) {
-    pageSet.add(2)
-    pageSet.add(3)
-    pageSet.add(4)
-  }
-
-  if (currentPage >= totalPages - 2) {
-    pageSet.add(totalPages - 1)
-    pageSet.add(totalPages - 2)
-    pageSet.add(totalPages - 3)
-  }
-
-  const sortedPages = Array.from(pageSet)
-    .filter((page) => page >= 1 && page <= totalPages)
-    .sort((first, second) => first - second)
-
-  const compactItems: PaginationItem[] = []
-  sortedPages.forEach((page, index) => {
-    const previous = sortedPages[index - 1]
-    if (previous && page - previous > 1) {
-      compactItems.push('ellipsis')
-    }
-    compactItems.push(page)
-  })
-
-  return compactItems
-}
 
 export const ManageReviewsPage = () => {
+  const paginationLimit = usePaginationLimit()
   const navigate = useNavigate()
   const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(true)
@@ -88,8 +53,8 @@ export const ManageReviewsPage = () => {
   }, [filteredReviews, safeCurrentPage])
 
   const pageNumbers = useMemo(() => {
-    return buildCompactPagination(safeCurrentPage, totalPages)
-  }, [safeCurrentPage, totalPages])
+    return buildCompactPagination(safeCurrentPage, totalPages, paginationLimit)
+  }, [paginationLimit, safeCurrentPage, totalPages])
 
   const handleUpdateStatus = async (review: Review, status: Review['status']) => {
     const updated = await apiService.updateReviewStatus(review.id, status)
@@ -207,14 +172,15 @@ export const ManageReviewsPage = () => {
                 <p>
                   Página {safeCurrentPage} de {totalPages}
                 </p>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 justify-end">
                   <button
                     type="button"
                     onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))}
                     disabled={safeCurrentPage === 1}
                     className="rounded-lg border border-primary-300 px-3 py-1.5 font-semibold text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    ← Anterior
+                    <span className="sm:hidden">←</span>
+                    <span className="hidden sm:inline">← Anterior</span>
                   </button>
                   {pageNumbers.map((pageItem, index) => {
                     if (pageItem === 'ellipsis') {
@@ -246,7 +212,8 @@ export const ManageReviewsPage = () => {
                     disabled={safeCurrentPage === totalPages}
                     className="rounded-lg border border-primary-300 px-3 py-1.5 font-semibold text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Siguiente →
+                    <span className="sm:hidden">→</span>
+                    <span className="hidden sm:inline">Siguiente →</span>
                   </button>
                 </div>
               </div>
